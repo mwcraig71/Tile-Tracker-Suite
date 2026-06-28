@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNearestCities } from "@/hooks/useNearestCities";
 
-const CATEGORIES = ["Drone", "UT Machine", "D-Meter", "Laser Measurer", "Boat", "Other"];
+import { EQUIPMENT_CATEGORIES } from "@/lib/categories";
+const CATEGORIES = [...EQUIPMENT_CATEGORIES];
 const ALL = "all";
 
 export default function EquipmentList() {

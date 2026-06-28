@@ -7,14 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Equipment, EquipmentInput } from "@workspace/api-client-react/src/generated/api.schemas";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Equipment } from "@workspace/api-client-react/src/generated/api.schemas";
 import { useCreateEquipment, useUpdateEquipment, useDeleteEquipment } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2 } from "lucide-react";
-
-const EQUIPMENT_CATEGORIES = ["Drone", "UT Machine", "D-Meter", "Laser Measurer", "Boat", "Other"] as const;
+import { Trash2, Camera, QrCode, X } from "lucide-react";
+import { EQUIPMENT_CATEGORIES } from "@/lib/categories";
+import { QrScannerCamera } from "@/components/QrScannerCamera";
 
 const formSchema = z.object({
   label: z.string().min(1, "Label is required"),
@@ -22,6 +23,9 @@ const formSchema = z.object({
   description: z.string().optional(),
   serialNumber: z.string().optional(),
   notes: z.string().optional(),
+  inServiceDate: z.string().optional(),
+  outOfServiceDate: z.string().optional(),
+  customQrCode: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -34,12 +38,18 @@ interface EquipmentFormDialogProps {
 
 export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger }: EquipmentFormDialogProps) {
   const [open, setOpen] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const createMutation = useCreateEquipment();
   const updateMutation = useUpdateEquipment();
   const deleteMutation = useDeleteEquipment();
+
+  function toDateInputValue(iso?: string | null) {
+    if (!iso) return "";
+    return new Date(iso).toISOString().slice(0, 10);
+  }
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -49,149 +59,291 @@ export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger }: Eq
       description: existingEquipment?.description || "",
       serialNumber: existingEquipment?.serialNumber || "",
       notes: existingEquipment?.notes || "",
+      inServiceDate: toDateInputValue(existingEquipment?.inServiceDate),
+      outOfServiceDate: toDateInputValue(existingEquipment?.outOfServiceDate),
+      customQrCode: existingEquipment?.customQrCode || "",
     },
   });
 
+  function handleQrDetected(value: string) {
+    form.setValue("customQrCode", value);
+    setShowScanner(false);
+    toast({ title: "QR code detected", description: `Value: ${value.slice(0, 60)}${value.length > 60 ? "…" : ""}` });
+  }
+
   const onSubmit = async (values: FormValues) => {
     try {
+      const payload: any = {
+        ...values,
+        inServiceDate: values.inServiceDate ? new Date(values.inServiceDate).toISOString() : undefined,
+        outOfServiceDate: values.outOfServiceDate ? new Date(values.outOfServiceDate).toISOString() : undefined,
+        customQrCode: values.customQrCode || undefined,
+      };
+
       if (existingEquipment) {
-        await updateMutation.mutateAsync({
-          id: existingEquipment.id,
-          data: values,
-        });
-        toast({ title: "Equipment updated", description: "The equipment record has been updated." });
+        await updateMutation.mutateAsync({ id: existingEquipment.id, data: payload });
+        toast({ title: "Equipment updated" });
       } else {
-        await createMutation.mutateAsync({
-          data: {
-            tileUuid,
-            ...values,
-          },
-        });
-        toast({ title: "Equipment created", description: "New equipment record linked to Tile." });
+        await createMutation.mutateAsync({ data: { tileUuid, ...payload } });
+        toast({ title: "Equipment created", description: "Record linked to Tile." });
       }
       queryClient.invalidateQueries();
       setOpen(false);
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to save equipment. Please try again.", variant: "destructive" });
+    } catch {
+      toast({ title: "Error", description: "Failed to save. Please try again.", variant: "destructive" });
     }
   };
 
   const handleDelete = async () => {
     if (!existingEquipment) return;
-    if (confirm("Are you sure you want to delete this equipment record? The Tile will remain but lose its metadata.")) {
+    if (confirm("Delete this equipment record? The Tile will remain but lose its metadata.")) {
       try {
         await deleteMutation.mutateAsync({ id: existingEquipment.id });
-        toast({ title: "Equipment deleted", description: "The record has been removed." });
+        toast({ title: "Equipment deleted" });
         queryClient.invalidateQueries();
         setOpen(false);
-      } catch (error) {
-        toast({ title: "Error", description: "Failed to delete equipment.", variant: "destructive" });
+      } catch {
+        toast({ title: "Error", description: "Failed to delete.", variant: "destructive" });
       }
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) setShowScanner(false); }}>
       <DialogTrigger asChild>
-        {trigger || <Button variant={existingEquipment ? "outline" : "default"} size="sm" className="font-mono text-xs uppercase tracking-wider rounded-none">{existingEquipment ? "Edit Details" : "Add Equipment"}</Button>}
+        {trigger || (
+          <Button
+            variant={existingEquipment ? "outline" : "default"}
+            size="sm"
+            className="font-mono text-xs uppercase tracking-wider rounded-none"
+          >
+            {existingEquipment ? "Edit Details" : "Add Equipment"}
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] border-primary/20 rounded-none bg-card">
+
+      <DialogContent className="sm:max-w-[520px] border-primary/20 rounded-none bg-card max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-mono text-primary uppercase tracking-wider">
             {existingEquipment ? "Edit Equipment" : "Link Equipment"}
           </DialogTitle>
         </DialogHeader>
-        
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="label"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-mono text-xs uppercase">Equipment Label</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Primary Drone" className="font-mono text-sm bg-background rounded-none border-border" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-0">
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="w-full rounded-none bg-muted/50 mb-4 h-9">
+                <TabsTrigger value="details" className="flex-1 font-mono text-xs uppercase rounded-none">Details</TabsTrigger>
+                <TabsTrigger value="service" className="flex-1 font-mono text-xs uppercase rounded-none">Service</TabsTrigger>
+                <TabsTrigger value="qr" className="flex-1 font-mono text-xs uppercase rounded-none">QR / Tag</TabsTrigger>
+              </TabsList>
 
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-mono text-xs uppercase">Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="font-mono text-sm bg-background rounded-none border-border">
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="rounded-none font-mono">
-                      {EQUIPMENT_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat} className="font-mono text-sm">
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {/* ── Details tab ── */}
+              <TabsContent value="details" className="space-y-4 mt-0">
+                <FormField
+                  control={form.control}
+                  name="label"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase">Equipment Label *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Primary Drone" className="font-mono text-sm bg-background rounded-none border-border" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="serialNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-mono text-xs uppercase">Serial Number (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="SN-12345" className="font-mono text-sm bg-background rounded-none border-border" {...field} value={field.value || ''} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase">Category *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="font-mono text-sm bg-background rounded-none border-border">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="rounded-none font-mono">
+                          {EQUIPMENT_CATEGORIES.map(cat => (
+                            <SelectItem key={cat} value={cat} className="font-mono text-sm">{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-mono text-xs uppercase">Description (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Brief description" className="font-mono text-sm bg-background rounded-none border-border" {...field} value={field.value || ''} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="serialNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase">Serial Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="SN-12345" className="font-mono text-sm bg-background rounded-none border-border" {...field} value={field.value || ""} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-mono text-xs uppercase">Field Notes (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Maintenance logs, condition, etc." className="font-mono text-sm bg-background min-h-[80px] rounded-none border-border" {...field} value={field.value || ''} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase">Description</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Brief description" className="font-mono text-sm bg-background rounded-none border-border" {...field} value={field.value || ""} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
 
-            <div className="flex justify-between pt-4">
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase">Field Notes</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Maintenance logs, condition, certifications, etc." className="font-mono text-sm bg-background min-h-[80px] rounded-none border-border" {...field} value={field.value || ""} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
+
+              {/* ── Service dates tab ── */}
+              <TabsContent value="service" className="space-y-4 mt-0">
+                <p className="font-mono text-xs text-muted-foreground border-l-2 border-primary/40 pl-3">
+                  Track when this equipment entered and left active service. Required for rope access equipment with retirement dates.
+                </p>
+
+                <FormField
+                  control={form.control}
+                  name="inServiceDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase">In-Service Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          className="font-mono text-sm bg-background rounded-none border-border"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="outOfServiceDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase">Out-of-Service Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          className="font-mono text-sm bg-background rounded-none border-border"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <p className="font-mono text-xs text-muted-foreground mt-1">
+                        Set this date when equipment is retired, damaged, or decommissioned.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
+
+              {/* ── QR / Tag tab ── */}
+              <TabsContent value="qr" className="space-y-4 mt-0">
+                <p className="font-mono text-xs text-muted-foreground border-l-2 border-primary/40 pl-3">
+                  Attach an existing asset tag or barcode to this equipment. Scan it with the camera or type the value manually. The FieldTrack QR code is always auto-generated separately.
+                </p>
+
+                {showScanner ? (
+                  <QrScannerCamera
+                    onDetected={handleQrDetected}
+                    onClose={() => setShowScanner(false)}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    <FormField
+                      control={form.control}
+                      name="customQrCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="font-mono text-xs uppercase">Custom QR / Barcode Value</FormLabel>
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input
+                                placeholder="Scan or type asset tag value"
+                                className="font-mono text-sm bg-background rounded-none border-border"
+                                {...field}
+                                value={field.value || ""}
+                              />
+                            </FormControl>
+                            {field.value && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="rounded-none flex-shrink-0"
+                                onClick={() => form.setValue("customQrCode", "")}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowScanner(true)}
+                      className="w-full font-mono text-xs uppercase tracking-wider rounded-none gap-2 border-primary/30 hover:text-primary"
+                      data-testid="button-open-qr-scanner"
+                    >
+                      <Camera className="h-4 w-4" /> Scan QR / Barcode with Camera
+                    </Button>
+
+                    {form.watch("customQrCode") && (
+                      <div className="flex items-start gap-2 p-3 border border-green-500/30 bg-green-500/5">
+                        <QrCode className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <p className="font-mono text-xs text-green-400 break-all">
+                          {form.watch("customQrCode")}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-between pt-5 border-t border-border mt-4">
               {existingEquipment ? (
                 <Button type="button" variant="destructive" size="icon" onClick={handleDelete} disabled={deleteMutation.isPending} className="rounded-none">
                   <Trash2 className="h-4 w-4" />
                 </Button>
-              ) : <div></div>}
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="font-mono uppercase tracking-wider rounded-none">
+              ) : <div />}
+              <Button
+                type="submit"
+                disabled={createMutation.isPending || updateMutation.isPending}
+                className="font-mono uppercase tracking-wider rounded-none"
+              >
                 {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save Record"}
               </Button>
             </div>

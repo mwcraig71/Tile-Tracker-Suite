@@ -1,0 +1,1 @@
+- [Tile API Field Names](tile-api-field-names.md) — Tile detail endpoint uses `tile_uuid` not `uuid`; tile states use `tile_id`

@@ -78,6 +78,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "jsqr": "^1.4.0",
     "qrcode.react": "^4.2.0"
   }
 }

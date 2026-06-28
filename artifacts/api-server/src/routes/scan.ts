@@ -21,7 +21,7 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
   }
 }
 
-// GET /api/scan/:token — public, returns equipment info by QR token
+// GET /api/scan/:token — public
 scanRouter.get("/:token", async (req, res) => {
   try {
     const { token } = req.params;
@@ -36,14 +36,14 @@ scanRouter.get("/:token", async (req, res) => {
       return;
     }
 
-    const scans = await db
+    const [lastScan] = await db
       .select()
       .from(qrScansTable)
       .where(eq(qrScansTable.equipmentId, equipment.id))
       .orderBy(desc(qrScansTable.scannedAt))
       .limit(1);
 
-    const totalScansResult = await db
+    const allScans = await db
       .select()
       .from(qrScansTable)
       .where(eq(qrScansTable.equipmentId, equipment.id));
@@ -54,8 +54,11 @@ scanRouter.get("/:token", async (req, res) => {
       category: equipment.category,
       description: equipment.description ?? null,
       serialNumber: equipment.serialNumber ?? null,
-      lastQrScan: scans[0] ?? null,
-      totalScans: totalScansResult.length,
+      notes: equipment.notes ?? null,
+      inServiceDate: equipment.inServiceDate ? equipment.inServiceDate.toISOString() : null,
+      outOfServiceDate: equipment.outOfServiceDate ? equipment.outOfServiceDate.toISOString() : null,
+      lastQrScan: lastScan ?? null,
+      totalScans: allScans.length,
     });
   } catch (err) {
     logger.error({ err }, "Failed to get scan info");
@@ -63,7 +66,7 @@ scanRouter.get("/:token", async (req, res) => {
   }
 });
 
-// POST /api/scan/:token — record a QR scan with GPS coordinates
+// POST /api/scan/:token — record GPS location
 scanRouter.post("/:token", async (req, res) => {
   try {
     const { token } = req.params;
@@ -85,7 +88,6 @@ scanRouter.post("/:token", async (req, res) => {
       return;
     }
 
-    // Reverse geocode in the background (non-blocking for response speed)
     const city = await reverseGeocode(latitude, longitude);
 
     const [scan] = await db
@@ -100,7 +102,7 @@ scanRouter.post("/:token", async (req, res) => {
       })
       .returning();
 
-    logger.info({ equipmentId: equipment.id, city, latitude, longitude }, "QR scan recorded");
+    logger.info({ equipmentId: equipment.id, city }, "QR scan recorded");
     res.json(scan);
   } catch (err) {
     logger.error({ err }, "Failed to record scan");
@@ -108,7 +110,7 @@ scanRouter.post("/:token", async (req, res) => {
   }
 });
 
-// GET /api/equipment/:id/scans — scan history for an equipment item
+// GET /api/equipment/:id/scans
 export const equipmentScansRouter = Router({ mergeParams: true });
 
 equipmentScansRouter.get("/", async (req, res) => {

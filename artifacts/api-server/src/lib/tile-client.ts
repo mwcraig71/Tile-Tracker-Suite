@@ -13,7 +13,7 @@ interface TileState {
 
 interface TileApiResult {
   result: {
-    uuid: string;
+    tile_uuid: string;
     name: string;
     tile_type: string;
     archetype: string;
@@ -193,7 +193,7 @@ export async function getTiles(): Promise<TileDevice[]> {
     const state = r.last_tile_state;
 
     tiles.push({
-      uuid: r.uuid,
+      uuid: r.tile_uuid,
       name: r.name,
       kind: r.tile_type,
       archetype: r.archetype,

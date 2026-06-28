@@ -12,13 +12,14 @@ import EquipmentList from "./pages/EquipmentList";
 import EquipmentDetail from "./pages/EquipmentDetail";
 import Settings from "./pages/Settings";
 import ScanPage from "./pages/ScanPage";
+import ScannerPage from "./pages/ScannerPage";
 
 const queryClient = new QueryClient();
 
 function Router() {
   return (
     <Switch>
-      {/* Public scan page — no sidebar */}
+      {/* Public scan landing page — no sidebar */}
       <Route path="/scan/:token" component={ScanPage} />
 
       {/* App pages with sidebar */}
@@ -29,6 +30,7 @@ function Router() {
             <Route path="/map" component={MapPage} />
             <Route path="/equipment" component={EquipmentList} />
             <Route path="/equipment/:id" component={EquipmentDetail} />
+            <Route path="/scanner" component={ScannerPage} />
             <Route path="/settings" component={Settings} />
             <Route component={NotFound} />
           </Switch>
