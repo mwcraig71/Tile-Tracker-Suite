@@ -16,6 +16,7 @@ export interface ErrorResponse {
 export interface Equipment {
   id: number;
   tileUuid: string;
+  qrToken: string;
   label: string;
   category: string;
   /** @nullable */
@@ -89,5 +90,37 @@ export interface DashboardSummary {
   dead: number;
   byCategory: CategoryCount[];
   recentlyLost: TileDevice[];
+}
+
+export interface QrScan {
+  id: number;
+  equipmentId: number;
+  latitude: number;
+  longitude: number;
+  /** @nullable */
+  accuracy?: number | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  userAgent?: string | null;
+  scannedAt: string;
+}
+
+export interface ScanInfo {
+  equipmentId: number;
+  label: string;
+  category: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  serialNumber?: string | null;
+  lastQrScan?: QrScan | null;
+  totalScans: number;
+}
+
+export interface ScanLocationInput {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
 }
 

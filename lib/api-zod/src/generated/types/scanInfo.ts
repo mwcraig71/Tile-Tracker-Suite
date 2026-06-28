@@ -5,19 +5,16 @@
  * Equipment Tracker API - proxies Tile API and stores equipment metadata
  * OpenAPI spec version: 0.1.0
  */
+import type { QrScan } from './qrScan';
 
-export interface Equipment {
-  id: number;
-  tileUuid: string;
-  qrToken: string;
+export interface ScanInfo {
+  equipmentId: number;
   label: string;
   category: string;
   /** @nullable */
   description?: string | null;
   /** @nullable */
   serialNumber?: string | null;
-  /** @nullable */
-  notes?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  lastQrScan?: QrScan | null;
+  totalScans: number;
 }

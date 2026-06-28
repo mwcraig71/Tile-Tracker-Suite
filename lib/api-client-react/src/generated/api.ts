@@ -27,6 +27,9 @@ import type {
   ErrorResponse,
   HealthStatus,
   LocationPoint,
+  QrScan,
+  ScanInfo,
+  ScanLocationInput,
   TileDevice
 } from './api.schemas';
 
@@ -66,7 +69,6 @@ export const getHealthCheckUrl = () => {
 }
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus> => {
@@ -144,7 +146,6 @@ export const getGetTilesUrl = () => {
 }
 
 /**
- * Fetches all active Tiles from the authenticated Tile account with current location data
  * @summary Get all Tiles from Tile account
  */
 export const getTiles = async ( options?: RequestInit): Promise<TileDevice[]> => {
@@ -655,6 +656,83 @@ export const useDeleteEquipment = <TError = ErrorType<unknown>,
       return useMutation(getDeleteEquipmentMutationOptions(options));
     }
 
+export const getListQrScansUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipment/${id}/scans`
+}
+
+/**
+ * @summary Get QR scan history for an equipment item
+ */
+export const listQrScans = async (id: number, options?: RequestInit): Promise<QrScan[]> => {
+
+  return customFetch<QrScan[]>(getListQrScansUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListQrScansQueryKey = (id: number,) => {
+    return [
+    `/api/equipment/${id}/scans`
+    ] as const;
+    }
+
+
+export const getListQrScansQueryOptions = <TData = Awaited<ReturnType<typeof listQrScans>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQrScans>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListQrScansQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listQrScans>>> = ({ signal }) => listQrScans(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listQrScans>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListQrScansQueryResult = NonNullable<Awaited<ReturnType<typeof listQrScans>>>
+export type ListQrScansQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get QR scan history for an equipment item
+ */
+
+export function useListQrScans<TData = Awaited<ReturnType<typeof listQrScans>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQrScans>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListQrScansQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetDashboardSummaryUrl = () => {
 
 
@@ -731,4 +809,152 @@ export function useGetDashboardSummary<TData = Awaited<ReturnType<typeof getDash
 
 
 
+
+export const getGetScanInfoUrl = (token: string,) => {
+
+
+
+
+  return `/api/scan/${token}`
+}
+
+/**
+ * @summary Get equipment info by QR token (public)
+ */
+export const getScanInfo = async (token: string, options?: RequestInit): Promise<ScanInfo> => {
+
+  return customFetch<ScanInfo>(getGetScanInfoUrl(token),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScanInfoQueryKey = (token: string,) => {
+    return [
+    `/api/scan/${token}`
+    ] as const;
+    }
+
+
+export const getGetScanInfoQueryOptions = <TData = Awaited<ReturnType<typeof getScanInfo>>, TError = ErrorType<ErrorResponse>>(token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScanInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScanInfoQueryKey(token);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScanInfo>>> = ({ signal }) => getScanInfo(token, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: token !== null && token !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScanInfo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScanInfoQueryResult = NonNullable<Awaited<ReturnType<typeof getScanInfo>>>
+export type GetScanInfoQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get equipment info by QR token (public)
+ */
+
+export function useGetScanInfo<TData = Awaited<ReturnType<typeof getScanInfo>>, TError = ErrorType<ErrorResponse>>(
+ token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScanInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScanInfoQueryOptions(token,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRecordScanUrl = (token: string,) => {
+
+
+
+
+  return `/api/scan/${token}`
+}
+
+/**
+ * @summary Record a QR scan with GPS location
+ */
+export const recordScan = async (token: string,
+    scanLocationInput: ScanLocationInput, options?: RequestInit): Promise<QrScan> => {
+
+  return customFetch<QrScan>(getRecordScanUrl(token),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(scanLocationInput)
+  }
+);}
+
+
+
+
+export const getRecordScanMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordScan>>, TError,{token: string;data: BodyType<ScanLocationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordScan>>, TError,{token: string;data: BodyType<ScanLocationInput>}, TContext> => {
+
+const mutationKey = ['recordScan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordScan>>, {token: string;data: BodyType<ScanLocationInput>}> = (props) => {
+          const {token,data} = props ?? {};
+
+          return  recordScan(token,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordScanMutationResult = NonNullable<Awaited<ReturnType<typeof recordScan>>>
+    export type RecordScanMutationBody = BodyType<ScanLocationInput>
+    export type RecordScanMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Record a QR scan with GPS location
+ */
+export const useRecordScan = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordScan>>, TError,{token: string;data: BodyType<ScanLocationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordScan>>,
+        TError,
+        {token: string;data: BodyType<ScanLocationInput>},
+        TContext
+      > => {
+      return useMutation(getRecordScanMutationOptions(options));
+    }
 

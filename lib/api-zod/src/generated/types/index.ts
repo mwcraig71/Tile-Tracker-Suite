@@ -14,4 +14,7 @@ export * from './equipmentUpdate';
 export * from './errorResponse';
 export * from './healthStatus';
 export * from './locationPoint';
+export * from './qrScan';
+export * from './scanInfo';
+export * from './scanLocationInput';
 export * from './tileDevice';

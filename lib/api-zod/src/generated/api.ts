@@ -9,7 +9,6 @@ import * as zod from 'zod';
 
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -18,7 +17,6 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * Fetches all active Tiles from the authenticated Tile account with current location data
  * @summary Get all Tiles from Tile account
  */
 export const GetTilesResponseItem = zod.object({
@@ -38,6 +36,7 @@ export const GetTilesResponseItem = zod.object({
   "equipment": zod.object({
   "id": zod.number(),
   "tileUuid": zod.string(),
+  "qrToken": zod.string(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -73,6 +72,7 @@ export const TileHistoryResponse = zod.array(TileHistoryResponseItem)
 export const ListEquipmentResponseItem = zod.object({
   "id": zod.number(),
   "tileUuid": zod.string(),
+  "qrToken": zod.string(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -99,6 +99,7 @@ export const CreateEquipmentBody = zod.object({
 export const CreateEquipmentResponse = zod.object({
   "id": zod.number(),
   "tileUuid": zod.string(),
+  "qrToken": zod.string(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -119,6 +120,7 @@ export const GetEquipmentParams = zod.object({
 export const GetEquipmentResponse = zod.object({
   "id": zod.number(),
   "tileUuid": zod.string(),
+  "qrToken": zod.string(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -147,6 +149,7 @@ export const UpdateEquipmentBody = zod.object({
 export const UpdateEquipmentResponse = zod.object({
   "id": zod.number(),
   "tileUuid": zod.string(),
+  "qrToken": zod.string(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -165,6 +168,26 @@ export const DeleteEquipmentParams = zod.object({
 })
 
 export const DeleteEquipmentResponse = zod.void()
+
+
+/**
+ * @summary Get QR scan history for an equipment item
+ */
+export const ListQrScansParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListQrScansResponseItem = zod.object({
+  "id": zod.number(),
+  "equipmentId": zod.number(),
+  "latitude": zod.number(),
+  "longitude": zod.number(),
+  "accuracy": zod.number().nullish(),
+  "city": zod.string().nullish(),
+  "userAgent": zod.string().nullish(),
+  "scannedAt": zod.string()
+})
+export const ListQrScansResponse = zod.array(ListQrScansResponseItem)
 
 
 /**
@@ -196,6 +219,7 @@ export const GetDashboardSummaryResponse = zod.object({
   "equipment": zod.object({
   "id": zod.number(),
   "tileUuid": zod.string(),
+  "qrToken": zod.string(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -205,6 +229,58 @@ export const GetDashboardSummaryResponse = zod.object({
   "updatedAt": zod.string()
 }).nullish()
 }))
+})
+
+
+/**
+ * @summary Get equipment info by QR token (public)
+ */
+export const GetScanInfoParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const GetScanInfoResponse = zod.object({
+  "equipmentId": zod.number(),
+  "label": zod.string(),
+  "category": zod.string(),
+  "description": zod.string().nullish(),
+  "serialNumber": zod.string().nullish(),
+  "lastQrScan": zod.object({
+  "id": zod.number(),
+  "equipmentId": zod.number(),
+  "latitude": zod.number(),
+  "longitude": zod.number(),
+  "accuracy": zod.number().nullish(),
+  "city": zod.string().nullish(),
+  "userAgent": zod.string().nullish(),
+  "scannedAt": zod.string()
+}).nullish(),
+  "totalScans": zod.number()
+})
+
+
+/**
+ * @summary Record a QR scan with GPS location
+ */
+export const RecordScanParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const RecordScanBody = zod.object({
+  "latitude": zod.number(),
+  "longitude": zod.number(),
+  "accuracy": zod.number().optional()
+})
+
+export const RecordScanResponse = zod.object({
+  "id": zod.number(),
+  "equipmentId": zod.number(),
+  "latitude": zod.number(),
+  "longitude": zod.number(),
+  "accuracy": zod.number().nullish(),
+  "city": zod.string().nullish(),
+  "userAgent": zod.string().nullish(),
+  "scannedAt": zod.string()
 })
 
 

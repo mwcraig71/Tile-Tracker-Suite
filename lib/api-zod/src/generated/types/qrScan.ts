@@ -6,18 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Equipment {
+export interface QrScan {
   id: number;
-  tileUuid: string;
-  qrToken: string;
-  label: string;
-  category: string;
+  equipmentId: number;
+  latitude: number;
+  longitude: number;
   /** @nullable */
-  description?: string | null;
+  accuracy?: number | null;
   /** @nullable */
-  serialNumber?: string | null;
+  city?: string | null;
   /** @nullable */
-  notes?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  userAgent?: string | null;
+  scannedAt: string;
 }

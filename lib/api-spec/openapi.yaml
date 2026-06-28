@@ -15,13 +15,14 @@ tags:
     description: Equipment metadata operations
   - name: history
     description: Location history operations
+  - name: scan
+    description: QR code scan operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -35,7 +36,6 @@ paths:
       operationId: getTiles
       tags: [tiles]
       summary: Get all Tiles from Tile account
-      description: Fetches all active Tiles from the authenticated Tile account with current location data
       responses:
         "200":
           description: List of tiles
@@ -184,6 +184,33 @@ paths:
         "204":
           description: Deleted
 
+  /equipment/{id}/scans:
+    get:
+      operationId: listQrScans
+      tags: [scan]
+      summary: Get QR scan history for an equipment item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scan history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QrScan"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /dashboard/summary:
     get:
       operationId: getDashboardSummary
@@ -196,6 +223,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
+
+  /scan/{token}:
+    get:
+      operationId: getScanInfo
+      tags: [scan]
+      summary: Get equipment info by QR token (public)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Equipment info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanInfo"
+        "404":
+          description: Token not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: recordScan
+      tags: [scan]
+      summary: Record a QR scan with GPS location
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanLocationInput"
+      responses:
+        "200":
+          description: Scan recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrScan"
+        "404":
+          description: Token not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -282,6 +363,8 @@ components:
           type: integer
         tileUuid:
           type: string
+        qrToken:
+          type: string
         label:
           type: string
         category:
@@ -299,6 +382,7 @@ components:
       required:
         - id
         - tileUuid
+        - qrToken
         - label
         - category
         - createdAt
@@ -375,3 +459,66 @@ components:
       required:
         - category
         - count
+
+    QrScan:
+      type: object
+      properties:
+        id:
+          type: integer
+        equipmentId:
+          type: integer
+        latitude:
+          type: number
+        longitude:
+          type: number
+        accuracy:
+          type: ["number", "null"]
+        city:
+          type: ["string", "null"]
+        userAgent:
+          type: ["string", "null"]
+        scannedAt:
+          type: string
+      required:
+        - id
+        - equipmentId
+        - latitude
+        - longitude
+        - scannedAt
+
+    ScanInfo:
+      type: object
+      properties:
+        equipmentId:
+          type: integer
+        label:
+          type: string
+        category:
+          type: string
+        description:
+          type: ["string", "null"]
+        serialNumber:
+          type: ["string", "null"]
+        lastQrScan:
+          $ref: "#/components/schemas/QrScan"
+          nullable: true
+        totalScans:
+          type: integer
+      required:
+        - equipmentId
+        - label
+        - category
+        - totalScans
+
+    ScanLocationInput:
+      type: object
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+        accuracy:
+          type: number
+      required:
+        - latitude
+        - longitude
