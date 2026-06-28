@@ -1,15 +1,20 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Equipment Tracker API - proxies Tile API and stores equipment metadata
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: tiles
+    description: Tile device operations
+  - name: equipment
+    description: Equipment metadata operations
+  - name: history
+    description: Location history operations
 paths:
   /healthz:
     get:
@@ -24,6 +29,174 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /tiles:
+    get:
+      operationId: getTiles
+      tags: [tiles]
+      summary: Get all Tiles from Tile account
+      description: Fetches all active Tiles from the authenticated Tile account with current location data
+      responses:
+        "200":
+          description: List of tiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TileDevice"
+        "401":
+          description: Tile authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tiles/{tileUuid}/history:
+    get:
+      operationId: tileHistory
+      tags: [history]
+      summary: Get location history for a Tile (last 7 days)
+      parameters:
+        - name: tileUuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Location history entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LocationPoint"
+        "404":
+          description: Tile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /equipment:
+    get:
+      operationId: listEquipment
+      tags: [equipment]
+      summary: List all equipment records
+      responses:
+        "200":
+          description: List of equipment
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Equipment"
+    post:
+      operationId: createEquipment
+      tags: [equipment]
+      summary: Create or update equipment metadata for a Tile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EquipmentInput"
+      responses:
+        "201":
+          description: Equipment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Equipment"
+
+  /equipment/{id}:
+    get:
+      operationId: getEquipment
+      tags: [equipment]
+      summary: Get a single equipment record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Equipment record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Equipment"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateEquipment
+      tags: [equipment]
+      summary: Update equipment metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EquipmentUpdate"
+      responses:
+        "200":
+          description: Updated equipment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Equipment"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteEquipment
+      tags: [equipment]
+      summary: Delete equipment record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [equipment]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +207,171 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    TileDevice:
+      type: object
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        archetype:
+          type: string
+        latitude:
+          type: ["number", "null"]
+        longitude:
+          type: ["number", "null"]
+        altitude:
+          type: ["number", "null"]
+        accuracy:
+          type: ["number", "null"]
+        lastSeen:
+          type: ["string", "null"]
+        lost:
+          type: boolean
+        dead:
+          type: boolean
+        firmwareVersion:
+          type: string
+        hardwareVersion:
+          type: string
+        equipment:
+          $ref: "#/components/schemas/Equipment"
+          nullable: true
+      required:
+        - uuid
+        - name
+        - kind
+        - archetype
+        - lost
+        - dead
+        - firmwareVersion
+        - hardwareVersion
+
+    LocationPoint:
+      type: object
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+        altitude:
+          type: ["number", "null"]
+        accuracy:
+          type: ["number", "null"]
+        timestamp:
+          type: string
+      required:
+        - latitude
+        - longitude
+        - timestamp
+
+    Equipment:
+      type: object
+      properties:
+        id:
+          type: integer
+        tileUuid:
+          type: string
+        label:
+          type: string
+        category:
+          type: string
+        description:
+          type: ["string", "null"]
+        serialNumber:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - tileUuid
+        - label
+        - category
+        - createdAt
+        - updatedAt
+
+    EquipmentInput:
+      type: object
+      properties:
+        tileUuid:
+          type: string
+        label:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        serialNumber:
+          type: string
+        notes:
+          type: string
+      required:
+        - tileUuid
+        - label
+        - category
+
+    EquipmentUpdate:
+      type: object
+      properties:
+        label:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        serialNumber:
+          type: string
+        notes:
+          type: string
+
+    DashboardSummary:
+      type: object
+      properties:
+        total:
+          type: integer
+        active:
+          type: integer
+        lost:
+          type: integer
+        dead:
+          type: integer
+        byCategory:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryCount"
+        recentlyLost:
+          type: array
+          items:
+            $ref: "#/components/schemas/TileDevice"
+      required:
+        - total
+        - active
+        - lost
+        - dead
+        - byCategory
+        - recentlyLost
+
+    CategoryCount:
+      type: object
+      properties:
+        category:
+          type: string
+        count:
+          type: integer
+      required:
+        - category
+        - count
