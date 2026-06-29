@@ -226,20 +226,34 @@ export default function EquipmentList() {
                       <div className="font-mono text-xs text-muted-foreground">
                         {tile.lastSeen ? new Date(tile.lastSeen).toLocaleDateString() : "No signal"}
                       </div>
-                      {tile.equipment ? (
-                        <Link href={`/equipment/${tile.equipment.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            data-testid={`button-details-${tile.uuid}`}
-                            className="font-mono text-xs uppercase tracking-wider rounded-none hover:text-primary h-7 px-2"
-                          >
-                            Details
-                          </Button>
-                        </Link>
-                      ) : (
-                        <EquipmentFormDialog tileUuid={tile.uuid} />
-                      )}
+                      <div className="flex items-center gap-1">
+                        {tile.latitude != null && tile.longitude != null && (
+                          <Link href={`/map?tile=${tile.uuid}`}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="font-mono text-xs rounded-none hover:text-primary h-7 px-2 text-muted-foreground"
+                              title="Show on map"
+                            >
+                              <MapPin className="h-3.5 w-3.5" />
+                            </Button>
+                          </Link>
+                        )}
+                        {tile.equipment ? (
+                          <Link href={`/equipment/${tile.equipment.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-testid={`button-details-${tile.uuid}`}
+                              className="font-mono text-xs uppercase tracking-wider rounded-none hover:text-primary h-7 px-2"
+                            >
+                              Details
+                            </Button>
+                          </Link>
+                        ) : (
+                          <EquipmentFormDialog tileUuid={tile.uuid} />
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -318,20 +332,34 @@ export default function EquipmentList() {
                           {tile.lastSeen ? new Date(tile.lastSeen).toLocaleString() : "Never"}
                         </TableCell>
                         <TableCell className="text-right">
-                          {tile.equipment ? (
-                            <Link href={`/equipment/${tile.equipment.id}`}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                data-testid={`button-details-desktop-${tile.uuid}`}
-                                className="font-mono text-xs uppercase tracking-wider rounded-none hover:text-primary"
-                              >
-                                Details
-                              </Button>
-                            </Link>
-                          ) : (
-                            <EquipmentFormDialog tileUuid={tile.uuid} />
-                          )}
+                          <div className="flex items-center justify-end gap-1">
+                            {tile.latitude != null && tile.longitude != null && (
+                              <Link href={`/map?tile=${tile.uuid}`}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="font-mono text-xs rounded-none hover:text-primary text-muted-foreground"
+                                  title="Show on map"
+                                >
+                                  <MapPin className="h-3.5 w-3.5" />
+                                </Button>
+                              </Link>
+                            )}
+                            {tile.equipment ? (
+                              <Link href={`/equipment/${tile.equipment.id}`}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  data-testid={`button-details-desktop-${tile.uuid}`}
+                                  className="font-mono text-xs uppercase tracking-wider rounded-none hover:text-primary"
+                                >
+                                  Details
+                                </Button>
+                              </Link>
+                            ) : (
+                              <EquipmentFormDialog tileUuid={tile.uuid} />
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

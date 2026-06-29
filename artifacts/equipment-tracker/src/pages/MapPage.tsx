@@ -6,12 +6,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { getTileIcon } from "@/lib/map-icons";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import {
   X, MapPin, Clock, Tag, Hash, CalendarCheck, FileText, ExternalLink, Wifi
 } from "lucide-react";
 
-// Tile device shape from API
 type TileDevice = NonNullable<ReturnType<typeof useGetTiles>["data"]>[number];
 
 function MapController({ bounds }: { bounds: LatLngBounds | null }) {
@@ -21,6 +20,18 @@ function MapController({ bounds }: { bounds: LatLngBounds | null }) {
       map.fitBounds(bounds, { padding: [40, 40] });
     }
   }, [bounds, map]);
+  return null;
+}
+
+function FlyToTile({ tile }: { tile: TileDevice | null }) {
+  const map = useMap();
+  const flyDoneRef = useRef(false);
+  useEffect(() => {
+    if (tile && tile.latitude != null && tile.longitude != null && !flyDoneRef.current) {
+      flyDoneRef.current = true;
+      map.flyTo([tile.latitude, tile.longitude], 14, { duration: 1.2 });
+    }
+  }, [tile, map]);
   return null;
 }
 
@@ -50,9 +61,11 @@ function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: strin
 function MarkerLayer({
   tiles,
   onSelect,
+  selectedUuid,
 }: {
   tiles: TileDevice[];
   onSelect: (tile: TileDevice) => void;
+  selectedUuid: string | null;
 }) {
   return (
     <>
@@ -62,6 +75,7 @@ function MarkerLayer({
           position={[tile.latitude!, tile.longitude!]}
           icon={getTileIcon(tile)}
           eventHandlers={{ click: () => onSelect(tile) }}
+          zIndexOffset={tile.uuid === selectedUuid ? 1000 : 0}
         />
       ))}
     </>
@@ -69,16 +83,21 @@ function MarkerLayer({
 }
 
 export default function MapPage() {
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const targetUuid = params.get("tile");
+
   const { data: tiles, isLoading } = useGetTiles({
     query: { queryKey: getGetTilesQueryKey() }
   });
 
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
   const [selected, setSelected] = useState<TileDevice | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const didAutoSelect = useRef(false);
 
+  // Set initial bounds from all tiles (only when no target UUID)
   useEffect(() => {
-    if (tiles && tiles.length > 0) {
+    if (tiles && tiles.length > 0 && !targetUuid) {
       import("leaflet").then((L) => {
         const points = tiles
           .filter(t => t.latitude != null && t.longitude != null)
@@ -86,7 +105,18 @@ export default function MapPage() {
         if (points.length > 0) setBounds(L.latLngBounds(points));
       });
     }
-  }, [tiles]);
+  }, [tiles, targetUuid]);
+
+  // Auto-select the target tile from URL param
+  useEffect(() => {
+    if (targetUuid && tiles && !didAutoSelect.current) {
+      const tile = tiles.find(t => t.uuid === targetUuid);
+      if (tile) {
+        didAutoSelect.current = true;
+        setSelected(tile);
+      }
+    }
+  }, [targetUuid, tiles]);
 
   // Close panel on Escape
   useEffect(() => {
@@ -136,19 +166,21 @@ export default function MapPage() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
-        <MapController bounds={bounds} />
-        <MarkerLayer tiles={tiles ?? []} onSelect={setSelected} />
+        {!targetUuid && <MapController bounds={bounds} />}
+        <FlyToTile tile={selected} />
+        <MarkerLayer
+          tiles={tiles ?? []}
+          onSelect={setSelected}
+          selectedUuid={selected?.uuid ?? null}
+        />
       </MapContainer>
 
       {/* Detail panel — slides up from bottom on mobile, in from right on desktop */}
       <div
-        ref={panelRef}
         className={`
           absolute z-[2000] bg-background border-border shadow-2xl
           transition-transform duration-300 ease-in-out
-          /* mobile: bottom sheet */
           bottom-0 left-0 right-0 border-t max-h-[70vh] overflow-y-auto
-          /* desktop: right panel */
           md:top-0 md:bottom-0 md:left-auto md:right-0 md:w-80 md:max-h-full
           md:border-t-0 md:border-l
           ${selected

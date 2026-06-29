@@ -10,7 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, MapPin, HardDrive, Clock, Tag, FileText, ArrowLeft, QrCode, Download, ScanLine, CalendarCheck, CalendarX, Trash2, ClipboardList } from "lucide-react";
+import { AlertTriangle, MapPin, HardDrive, Clock, Tag, FileText, ArrowLeft, QrCode, Download, ScanLine, CalendarCheck, CalendarX, Trash2, ClipboardList, Map } from "lucide-react";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
 import { EquipmentFormDialog } from "@/components/EquipmentFormDialog";
 import { AddLogDialog } from "@/components/AddLogDialog";
@@ -305,7 +305,19 @@ export default function EquipmentDetail() {
               {equipment.serialNumber && <><span className="text-border">|</span> <HardDrive className="h-3 w-3" /> SN: {equipment.serialNumber}</>}
             </p>
           </div>
-          <div className="flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {hasLocation && (
+              <Link href={`/map?tile=${equipment.tileUuid}`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-mono text-xs uppercase tracking-wider rounded-none gap-1.5 border-primary/30 hover:text-primary"
+                  title="Show on map"
+                >
+                  <Map className="h-3.5 w-3.5" /> Map
+                </Button>
+              </Link>
+            )}
             <EquipmentFormDialog tileUuid={equipment.tileUuid} existingEquipment={equipment} />
           </div>
         </div>
