@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useGetTiles, getGetTilesQueryKey } from "@workspace/api-client-react";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import type { LatLngBounds, LatLngTuple } from "leaflet";
@@ -94,6 +94,7 @@ export default function MapPage() {
 
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
   const [selected, setSelected] = useState<TileDevice | null>(null);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const didAutoSelect = useRef(false);
 
   // Set initial bounds from all tiles (only when no target UUID)
@@ -304,17 +305,13 @@ export default function MapPage() {
                   </Button>
                 </Link>
               ) : (
-                <EquipmentFormDialog
-                  tileUuid={selected.uuid}
-                  trigger={
-                    <Button
-                      variant="outline"
-                      className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
-                    >
-                      Link Equipment
-                    </Button>
-                  }
-                />
+                <Button
+                  variant="outline"
+                  className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
+                  onClick={(e) => { e.stopPropagation(); setLinkDialogOpen(true); }}
+                >
+                  Link Equipment
+                </Button>
               )}
             </div>
           </div>
@@ -326,6 +323,15 @@ export default function MapPage() {
         <div
           className="absolute inset-0 z-[1999] md:hidden"
           onClick={() => setSelected(null)}
+        />
+      )}
+
+      {/* Link Equipment dialog — rendered at root to avoid Leaflet event conflicts */}
+      {selected && !selected.equipment && (
+        <EquipmentFormDialog
+          tileUuid={selected.uuid}
+          open={linkDialogOpen}
+          onOpenChange={(v) => { setLinkDialogOpen(v); }}
         />
       )}
     </div>

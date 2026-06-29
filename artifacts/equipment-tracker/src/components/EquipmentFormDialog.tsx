@@ -34,10 +34,14 @@ interface EquipmentFormDialogProps {
   tileUuid: string;
   existingEquipment?: Equipment | null;
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger }: EquipmentFormDialogProps) {
-  const [open, setOpen] = useState(false);
+export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger, open: openProp, onOpenChange }: EquipmentFormDialogProps) {
+  const [openInternal, setOpenInternal] = useState(false);
+  const open = openProp !== undefined ? openProp : openInternal;
+  const setOpen = (v: boolean) => { setOpenInternal(v); onOpenChange?.(v); };
   const [showScanner, setShowScanner] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
