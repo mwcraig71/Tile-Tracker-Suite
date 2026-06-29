@@ -47,6 +47,28 @@ const clientUuid = randomUUID();
 // Cookie jar to persist session cookies across requests
 let sessionCookies: string[] = [];
 
+// In-memory credential override (takes priority over env vars)
+let credentialOverride: { email: string; password: string } | null = null;
+
+export function setCredentials(email: string, password: string): void {
+  credentialOverride = { email, password };
+  // Force session re-init on next request
+  sessionExpiry = null;
+  sessionCookies = [];
+}
+
+export function getCredentialsStatus(): { configured: boolean; email: string | null; source: "override" | "env" | "none"; sessionActive: boolean } {
+  if (credentialOverride) {
+    return { configured: true, email: credentialOverride.email, source: "override", sessionActive: !!(sessionExpiry && sessionExpiry > Date.now()) };
+  }
+  const email = process.env.TILE_EMAIL;
+  const password = process.env.TILE_PASSWORD;
+  if (email && password) {
+    return { configured: true, email, source: "env", sessionActive: !!(sessionExpiry && sessionExpiry > Date.now()) };
+  }
+  return { configured: false, email: null, source: "none", sessionActive: false };
+}
+
 function getHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const headers: Record<string, string> = {
     "User-Agent": DEFAULT_USER_AGENT,
@@ -115,11 +137,14 @@ async function tileRequest(
 }
 
 export async function initSession(): Promise<void> {
-  const email = process.env.TILE_EMAIL;
-  const password = process.env.TILE_PASSWORD;
+  const creds = credentialOverride ?? {
+    email: process.env.TILE_EMAIL ?? "",
+    password: process.env.TILE_PASSWORD ?? "",
+  };
+  const { email, password } = creds;
 
   if (!email || !password) {
-    throw new Error("TILE_EMAIL and TILE_PASSWORD environment variables are required");
+    throw new Error("Tile credentials are not configured. Enter your email and password in Settings.");
   }
 
   // Reset expiry to avoid re-entrant loops

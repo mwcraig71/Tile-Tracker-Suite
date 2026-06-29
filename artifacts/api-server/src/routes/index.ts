@@ -6,6 +6,7 @@ import { dashboardRouter } from "./dashboard";
 import { scanRouter, equipmentScansRouter } from "./scan";
 import { equipmentLogsRouter } from "./logs";
 import { qrLookupRouter } from "./qr-lookup";
+import { settingsRouter } from "./settings";
 
 const router: IRouter = Router();
 
@@ -17,5 +18,6 @@ router.use("/equipment/:id/logs", equipmentLogsRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/scan", scanRouter);
 router.use("/qr/lookup", qrLookupRouter);
+router.use("/settings", settingsRouter);
 
 export default router;
