@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import {
   useGetEquipment, getGetEquipmentQueryKey,
@@ -96,6 +97,85 @@ function QrCodeCard({ equipment }: { equipment: { id: number; label: string; qrT
   );
 }
 
+type LocationPoint = { latitude?: number | null; longitude?: number | null; timestamp: string };
+
+async function reverseGeocodeCity(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10&addressdetails=1`,
+      { headers: { "Accept-Language": "en-US,en" } }
+    );
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const a = data.address || {};
+    return a.city || a.town || a.village || a.municipality || a.county || a.state || "Unknown";
+  } catch {
+    return "Unknown";
+  }
+}
+
+function TileSignalHistory({ history, loading }: { history: LocationPoint[]; loading: boolean }) {
+  const [cities, setCities] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (!history.length) return;
+    const pts = history.filter(pt => pt.latitude != null && pt.longitude != null);
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < pts.length; i++) {
+        if (cancelled) break;
+        const pt = pts[i];
+        const city = await reverseGeocodeCity(pt.latitude!, pt.longitude!);
+        if (!cancelled) setCities(prev => ({ ...prev, [i]: city }));
+        if (i < pts.length - 1) await new Promise(r => setTimeout(r, 1100));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [history]);
+
+  return (
+    <Card className="border-border bg-card rounded-none">
+      <CardHeader className="border-b border-border bg-muted/30 py-3 px-4">
+        <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" /> Last 7 Known Locations
+          {history.length > 0 && <span className="ml-auto text-primary font-bold">{history.length} points</span>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0 overflow-y-auto max-h-48">
+        {loading ? (
+          <div className="p-4 space-y-2"><Skeleton className="h-8 w-full bg-muted" /></div>
+        ) : history.length > 0 ? (
+          <div className="divide-y divide-border">
+            {history.filter(pt => pt.latitude != null && pt.longitude != null).map((pt, i) => (
+              <a
+                key={i}
+                href={`https://www.google.com/maps?q=${pt.latitude},${pt.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors group text-xs font-mono"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <MapPin className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                  <span className="text-foreground font-medium group-hover:text-primary transition-colors truncate">
+                    {cities[i] ?? <span className="text-muted-foreground italic">Resolving…</span>}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0 text-muted-foreground">
+                  <span className="hidden sm:block">{pt.latitude?.toFixed(5)}, {pt.longitude?.toFixed(5)}</span>
+                  <span>{new Date(pt.timestamp).toLocaleDateString()}</span>
+                  <span className="text-primary/50 opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div className="p-6 text-center text-muted-foreground font-mono text-sm">No signal history available.</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function QrScanHistory({ equipmentId }: { equipmentId: number }) {
   const { data: scans, isLoading } = useListQrScans(equipmentId, {
     query: { queryKey: getListQrScansQueryKey(equipmentId) }
@@ -115,19 +195,28 @@ function QrScanHistory({ equipmentId }: { equipmentId: number }) {
         ) : scans && scans.length > 0 ? (
           <div className="divide-y divide-border">
             {scans.map(scan => (
-              <div key={scan.id} className="px-4 py-3 hover:bg-muted/20 transition-colors">
+              <a
+                key={scan.id}
+                href={`https://www.google.com/maps?q=${scan.latitude},${scan.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block px-4 py-3 hover:bg-muted/20 transition-colors group"
+              >
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 font-mono text-sm">
                     <MapPin className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                    <span className="text-foreground font-medium">{scan.city ?? "Unknown location"}</span>
+                    <span className="text-foreground font-medium group-hover:text-primary transition-colors">
+                      {scan.city ?? "Unknown location"}
+                    </span>
                   </div>
                   <div className="font-mono text-xs text-muted-foreground">{new Date(scan.scannedAt).toLocaleString()}</div>
                 </div>
                 <div className="font-mono text-xs text-muted-foreground mt-1 pl-5">
                   {scan.latitude.toFixed(5)}, {scan.longitude.toFixed(5)}
                   {scan.accuracy != null && <span className="ml-2">±{Math.round(scan.accuracy)}m</span>}
+                  <span className="ml-2 text-primary/50 opacity-0 group-hover:opacity-100 transition-opacity">↗ Open in Maps</span>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         ) : (
@@ -438,32 +527,7 @@ export default function EquipmentDetail() {
           <QrScanHistory equipmentId={equipmentId} />
 
           {/* Tile signal history */}
-          <Card className="border-border bg-card rounded-none">
-            <CardHeader className="border-b border-border bg-muted/30 py-3 px-4">
-              <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-primary" /> Tile Signal History (Last 7 Days)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 overflow-y-auto max-h-48">
-              {loadingHist ? (
-                <div className="p-4 space-y-2"><Skeleton className="h-8 w-full bg-muted" /></div>
-              ) : history && history.length > 0 ? (
-                <div className="divide-y divide-border">
-                  {history.map((pt, i) => (
-                    <div key={i} className="p-3 px-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 hover:bg-muted/20 text-xs font-mono">
-                      <div className="text-foreground">{new Date(pt.timestamp).toLocaleString()}</div>
-                      <div className="text-muted-foreground flex gap-3">
-                        <span>LAT: {pt.latitude?.toFixed(5)}</span>
-                        <span>LNG: {pt.longitude?.toFixed(5)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-6 text-center text-muted-foreground font-mono text-sm">No Tile signal history available.</div>
-              )}
-            </CardContent>
-          </Card>
+          <TileSignalHistory history={history ?? []} loading={loadingHist} />
         </div>
       </div>
     </div>
