@@ -1,14 +1,69 @@
-import { useGetDashboardSummary, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import { useGetDashboardSummary, getGetDashboardSummaryQueryKey, useGetTiles, getGetTilesQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, AlertTriangle, Skull, Database, MapPin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
 import { Link } from "wouter";
+import { useNearestCities } from "@/hooks/useNearestCities";
+import { useMemo } from "react";
 
 export default function Dashboard() {
   const { data: summary, isLoading, isError } = useGetDashboardSummary({
     query: { queryKey: getGetDashboardSummaryQueryKey() }
   });
+
+  const { data: tiles } = useGetTiles({
+    query: { queryKey: getGetTilesQueryKey() }
+  });
+
+  // Deduplicate by ~1km grid (2 decimal places) so we only geocode unique city-level locations
+  // instead of all 54 individual tile coordinates (each Nominatim call costs 1 sec).
+  const representativeTiles = useMemo(() => {
+    if (!tiles) return [];
+    const seen = new Set<string>();
+    const result: typeof tiles = [];
+    for (const tile of tiles) {
+      if (tile.latitude == null || tile.longitude == null) continue;
+      const key = `${tile.latitude.toFixed(2)},${tile.longitude.toFixed(2)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(tile);
+      }
+    }
+    return result;
+  }, [tiles]);
+
+  const cities = useNearestCities(representativeTiles);
+
+  // Map every tile → its representative's resolved city
+  const byCity = useMemo(() => {
+    if (!tiles || !representativeTiles.length || cities.size === 0) return [];
+
+    // Build coord-key → city lookup from resolved representatives
+    const keyToCity = new Map<string, string>();
+    for (const rep of representativeTiles) {
+      if (rep.latitude == null || rep.longitude == null) continue;
+      const city = cities.get(rep.uuid);
+      if (city) keyToCity.set(`${rep.latitude.toFixed(2)},${rep.longitude.toFixed(2)}`, city);
+    }
+
+    const cityMap = new Map<string, number>();
+    for (const tile of tiles) {
+      if (tile.latitude == null || tile.longitude == null) continue;
+      const city = keyToCity.get(`${tile.latitude.toFixed(2)},${tile.longitude.toFixed(2)}`);
+      if (!city) continue;
+      cityMap.set(city, (cityMap.get(city) ?? 0) + 1);
+    }
+
+    return Array.from(cityMap.entries())
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [tiles, representativeTiles, cities]);
+
+  const maxCityCount = byCity[0]?.count ?? 1;
+  const resolvedCount = cities.size;
+  const totalCount = representativeTiles.length;
+  const allResolved = resolvedCount >= totalCount && totalCount > 0;
 
   if (isLoading) {
     return (
@@ -48,7 +103,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* 2-col on mobile, 4-col on desktop */}
+      {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <MetricCard title="Total Assets" value={summary.total} icon={<Database className="h-4 w-4 text-muted-foreground" />} />
         <MetricCard title="Active" value={summary.active} icon={<Activity className="h-4 w-4 text-green-500" />} />
@@ -56,7 +111,10 @@ export default function Dashboard() {
         <MetricCard title="Dead" value={summary.dead} icon={<Skull className="h-4 w-4 text-gray-500" />} />
       </div>
 
+      {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+
+        {/* Recently Lost */}
         <Card className="col-span-1 lg:col-span-2 border-primary/20 bg-card rounded-none">
           <CardHeader className="border-b border-border bg-muted/30 py-3 px-4">
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
@@ -94,27 +152,82 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="col-span-1 border-primary/20 bg-card rounded-none">
-          <CardHeader className="border-b border-border bg-muted/30 py-3 px-4">
-            <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <Database className="h-4 w-4 text-primary" /> Asset Breakdown
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 space-y-3">
-            {summary.byCategory.length === 0 ? (
-               <div className="text-center text-muted-foreground font-mono text-sm">
-                 No assets categorized.
-               </div>
-            ) : (
-              summary.byCategory.map(cat => (
-                <div key={cat.category} className="flex items-center justify-between">
-                  <span className="font-mono text-sm">{cat.category}</span>
-                  <span className="font-mono text-sm text-primary font-bold">{cat.count}</span>
+        {/* Right column: By Category + By Location stacked */}
+        <div className="col-span-1 flex flex-col gap-4 md:gap-6">
+
+          {/* By Category */}
+          <Card className="border-primary/20 bg-card rounded-none">
+            <CardHeader className="border-b border-border bg-muted/30 py-3 px-4">
+              <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Database className="h-4 w-4 text-primary" /> By Category
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3">
+              {summary.byCategory.length === 0 ? (
+                <div className="text-center text-muted-foreground font-mono text-sm">
+                  No assets categorized.
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                summary.byCategory.map(cat => (
+                  <div key={cat.category} className="flex items-center justify-between">
+                    <span className="font-mono text-sm">{cat.category}</span>
+                    <span className="font-mono text-sm text-primary font-bold">{cat.count}</span>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* By Location */}
+          <Card className="border-primary/20 bg-card rounded-none">
+            <CardHeader className="border-b border-border bg-muted/30 py-3 px-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" /> By Location
+                </CardTitle>
+                {!allResolved && totalCount > 0 && (
+                  <span className="font-mono text-[10px] text-muted-foreground animate-pulse">
+                    {resolvedCount}/{totalCount}
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3">
+              {byCity.length === 0 ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Skeleton className="h-3 flex-1 bg-muted/50" />
+                      <Skeleton className="h-3 w-6 bg-muted/50" />
+                    </div>
+                  ))}
+                  <p className="text-[10px] font-mono text-muted-foreground text-center pt-1">
+                    Resolving locations…
+                  </p>
+                </div>
+              ) : (
+                byCity.map(({ city, count }) => {
+                  const pct = Math.round((count / maxCityCount) * 100);
+                  return (
+                    <div key={city} className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs text-foreground truncate max-w-[140px]" title={city}>{city}</span>
+                        <span className="font-mono text-xs text-primary font-bold ml-2 flex-shrink-0">{count}</span>
+                      </div>
+                      <div className="h-1 bg-muted/40 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary/70 rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+
+        </div>
       </div>
     </div>
   );
