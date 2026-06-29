@@ -308,7 +308,7 @@ export default function MapPage() {
                 <Button
                   variant="outline"
                   className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
-                  onClick={(e) => { e.stopPropagation(); setLinkDialogOpen(true); }}
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); setTimeout(() => setLinkDialogOpen(true), 0); }}
                 >
                   Link Equipment
                 </Button>

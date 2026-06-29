@@ -114,17 +114,19 @@ export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger, open
 
   return (
     <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) setShowScanner(false); }}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button
-            variant={existingEquipment ? "outline" : "default"}
-            size="sm"
-            className="font-mono text-xs uppercase tracking-wider rounded-none"
-          >
-            {existingEquipment ? "Edit Details" : "Add Equipment"}
-          </Button>
-        )}
-      </DialogTrigger>
+      {openProp === undefined && (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button
+              variant={existingEquipment ? "outline" : "default"}
+              size="sm"
+              className="font-mono text-xs uppercase tracking-wider rounded-none"
+            >
+              {existingEquipment ? "Edit Details" : "Add Equipment"}
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
 
       <DialogContent className="sm:max-w-[520px] border-primary/20 rounded-none bg-card max-h-[90vh] overflow-y-auto">
         <DialogHeader>
