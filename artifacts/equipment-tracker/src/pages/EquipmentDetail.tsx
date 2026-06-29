@@ -526,8 +526,21 @@ export default function EquipmentDetail() {
           {/* QR Scan History */}
           <QrScanHistory equipmentId={equipmentId} />
 
-          {/* Tile signal history */}
-          <TileSignalHistory history={history ?? []} loading={loadingHist} />
+          {/* Tile signal history — always include tile's current location as a baseline */}
+          <TileSignalHistory
+            history={(() => {
+              const pts: LocationPoint[] = history ?? [];
+              if (tile?.latitude && tile?.longitude && tile?.lastSeen) {
+                const currentTs = new Date(tile.lastSeen).getTime();
+                const alreadyPresent = pts.some(p => Math.abs(new Date(p.timestamp).getTime() - currentTs) < 60_000);
+                if (!alreadyPresent) {
+                  return [{ latitude: tile.latitude, longitude: tile.longitude, timestamp: tile.lastSeen }, ...pts];
+                }
+              }
+              return pts;
+            })()}
+            loading={loadingHist}
+          />
         </div>
       </div>
     </div>
