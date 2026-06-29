@@ -1,11 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGetTiles, getGetTilesQueryKey } from "@workspace/api-client-react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import type { LatLngBounds, LatLngTuple } from "leaflet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { getTileIcon } from "@/lib/map-icons";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
 import { Link } from "wouter";
+import {
+  X, MapPin, Clock, Tag, Hash, CalendarCheck, FileText, ExternalLink, Wifi
+} from "lucide-react";
+
+// Tile device shape from API
+type TileDevice = NonNullable<ReturnType<typeof useGetTiles>["data"]>[number];
 
 function MapController({ bounds }: { bounds: LatLngBounds | null }) {
   const map = useMap();
@@ -17,12 +24,58 @@ function MapController({ bounds }: { bounds: LatLngBounds | null }) {
   return null;
 }
 
+function getCategoryStyle(category: string) {
+  switch (category) {
+    case "Drone":          return "bg-blue-500/20 text-blue-300 border-blue-500/30";
+    case "NDT":            return "bg-purple-500/20 text-purple-300 border-purple-500/30";
+    case "Rope Access":    return "bg-orange-500/20 text-orange-300 border-orange-500/30";
+    case "Laser Measurer": return "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
+    case "Boat":           return "bg-teal-500/20 text-teal-300 border-teal-500/30";
+    default:               return "bg-muted/40 text-muted-foreground border-border";
+  }
+}
+
+function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-0">
+      <div className="text-muted-foreground mt-0.5 flex-shrink-0">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{label}</div>
+        <div className="font-mono text-sm text-foreground break-words">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function MarkerLayer({
+  tiles,
+  onSelect,
+}: {
+  tiles: TileDevice[];
+  onSelect: (tile: TileDevice) => void;
+}) {
+  return (
+    <>
+      {tiles.filter(t => t.latitude != null && t.longitude != null).map((tile) => (
+        <Marker
+          key={tile.uuid}
+          position={[tile.latitude!, tile.longitude!]}
+          icon={getTileIcon(tile)}
+          eventHandlers={{ click: () => onSelect(tile) }}
+        />
+      ))}
+    </>
+  );
+}
+
 export default function MapPage() {
   const { data: tiles, isLoading } = useGetTiles({
     query: { queryKey: getGetTilesQueryKey() }
   });
 
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
+  const [selected, setSelected] = useState<TileDevice | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (tiles && tiles.length > 0) {
@@ -30,21 +83,31 @@ export default function MapPage() {
         const points = tiles
           .filter(t => t.latitude != null && t.longitude != null)
           .map(t => [t.latitude!, t.longitude!] as LatLngTuple);
-
-        if (points.length > 0) {
-          setBounds(L.latLngBounds(points));
-        }
+        if (points.length > 0) setBounds(L.latLngBounds(points));
       });
     }
   }, [tiles]);
+
+  // Close panel on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const eq = selected?.equipment ?? null;
+  const displayName = eq?.label || selected?.name || "—";
 
   if (isLoading) {
     return <div className="h-full w-full p-4"><Skeleton className="h-full w-full bg-card rounded-none" /></div>;
   }
 
   return (
-    <div className="h-full w-full flex flex-col relative">
-      {/* Legend — top-left on desktop, top-left on mobile with smaller offset */}
+    <div className="h-full w-full flex flex-col relative overflow-hidden">
+
+      {/* Legend */}
       <div className="absolute top-3 left-3 md:top-4 md:left-4 z-[1000] pointer-events-none">
         <div className="bg-background/90 backdrop-blur border border-border p-2 md:p-3 shadow-lg pointer-events-auto flex flex-col gap-1.5 md:gap-2">
           <h2 className="font-mono text-xs uppercase tracking-wider text-primary font-bold border-b border-border pb-1.5 mb-0.5">
@@ -62,6 +125,7 @@ export default function MapPage() {
         </div>
       </div>
 
+      {/* Map */}
       <MapContainer
         center={[39.8283, -98.5795]}
         zoom={4}
@@ -73,45 +137,162 @@ export default function MapPage() {
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
         <MapController bounds={bounds} />
+        <MarkerLayer tiles={tiles ?? []} onSelect={setSelected} />
+      </MapContainer>
 
-        {tiles?.filter(t => t.latitude != null && t.longitude != null).map((tile) => (
-          <Marker
-            key={tile.uuid}
-            position={[tile.latitude!, tile.longitude!]}
-            icon={getTileIcon(tile)}
-          >
-            <Popup>
-              <div className="font-mono text-xs space-y-2 p-1 min-w-[180px]">
-                <div className="font-bold text-sm text-foreground flex items-center justify-between border-b border-border pb-1 gap-2">
-                  <span className="truncate">{tile.equipment?.label || tile.name}</span>
-                  <TileStatusBadge tile={tile} />
+      {/* Detail panel — slides up from bottom on mobile, in from right on desktop */}
+      <div
+        ref={panelRef}
+        className={`
+          absolute z-[2000] bg-background border-border shadow-2xl
+          transition-transform duration-300 ease-in-out
+          /* mobile: bottom sheet */
+          bottom-0 left-0 right-0 border-t max-h-[70vh] overflow-y-auto
+          /* desktop: right panel */
+          md:top-0 md:bottom-0 md:left-auto md:right-0 md:w-80 md:max-h-full
+          md:border-t-0 md:border-l
+          ${selected
+            ? "translate-y-0 md:translate-x-0"
+            : "translate-y-full md:translate-x-full md:translate-y-0"
+          }
+        `}
+      >
+        {selected && (
+          <div className="flex flex-col h-full">
+            {/* Panel header */}
+            <div className="flex items-start justify-between gap-3 p-4 border-b border-border bg-muted/30 flex-shrink-0">
+              <div className="min-w-0 flex-1">
+                <div className="font-mono font-bold text-base text-foreground leading-tight truncate">
+                  {displayName}
                 </div>
-
-                {tile.equipment?.category && (
-                  <div className="text-muted-foreground">
-                    TYPE: <span className="text-foreground">{tile.equipment.category}</span>
-                  </div>
-                )}
-
-                <div className="text-muted-foreground">
-                  LAST SEEN: <span className="text-foreground">
-                    {tile.lastSeen ? new Date(tile.lastSeen).toLocaleDateString() : 'N/A'}
-                  </span>
-                </div>
-
-                <div className="pt-1">
-                  <Link
-                    href={tile.equipment ? `/equipment/${tile.equipment.id}` : `/equipment`}
-                    className="text-primary hover:text-primary/80 uppercase tracking-wider font-bold flex items-center gap-1"
-                  >
-                    View Details &rsaquo;
-                  </Link>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <TileStatusBadge tile={selected} />
+                  {eq?.category && (
+                    <span className={`font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 border ${getCategoryStyle(eq.category)}`}>
+                      {eq.category}
+                    </span>
+                  )}
+                  {!eq && (
+                    <span className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 border border-border text-muted-foreground">
+                      Unlinked
+                    </span>
+                  )}
                 </div>
               </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+              <button
+                onClick={() => setSelected(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 mt-0.5"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Detail rows */}
+            <div className="flex-1 overflow-y-auto px-4 py-2">
+              {eq?.serialNumber && (
+                <DetailRow
+                  icon={<Hash className="h-3.5 w-3.5" />}
+                  label="Serial #"
+                  value={eq.serialNumber}
+                />
+              )}
+
+              <DetailRow
+                icon={<Wifi className="h-3.5 w-3.5" />}
+                label="Tile Name"
+                value={selected.name}
+              />
+
+              <DetailRow
+                icon={<Clock className="h-3.5 w-3.5" />}
+                label="Last Seen"
+                value={selected.lastSeen
+                  ? new Date(selected.lastSeen).toLocaleString()
+                  : "Unknown"
+                }
+              />
+
+              <DetailRow
+                icon={<MapPin className="h-3.5 w-3.5" />}
+                label="Coordinates"
+                value={`${selected.latitude?.toFixed(5)}, ${selected.longitude?.toFixed(5)}`}
+              />
+
+              {eq?.inServiceDate && (
+                <DetailRow
+                  icon={<CalendarCheck className="h-3.5 w-3.5" />}
+                  label="In Service"
+                  value={new Date(eq.inServiceDate).toLocaleDateString()}
+                />
+              )}
+
+              {eq?.outOfServiceDate && (
+                <DetailRow
+                  icon={<CalendarCheck className="h-3.5 w-3.5" />}
+                  label="Out of Service"
+                  value={new Date(eq.outOfServiceDate).toLocaleDateString()}
+                />
+              )}
+
+              {eq?.customQrCode && (
+                <DetailRow
+                  icon={<Tag className="h-3.5 w-3.5" />}
+                  label="Asset Tag"
+                  value={eq.customQrCode}
+                />
+              )}
+
+              {eq?.notes && (
+                <DetailRow
+                  icon={<FileText className="h-3.5 w-3.5" />}
+                  label="Notes"
+                  value={<span className="text-muted-foreground">{eq.notes}</span>}
+                />
+              )}
+
+              {!eq && (
+                <div className="py-4 text-center font-mono text-xs text-muted-foreground border border-dashed border-border mt-2">
+                  No equipment linked to this tracker.
+                </div>
+              )}
+            </div>
+
+            {/* Footer action */}
+            <div className="flex-shrink-0 p-4 border-t border-border bg-muted/10">
+              {eq ? (
+                <Link href={`/equipment/${eq.id}`}>
+                  <Button
+                    className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
+                    onClick={() => setSelected(null)}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    View Full Details
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/equipment">
+                  <Button
+                    variant="outline"
+                    className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
+                    onClick={() => setSelected(null)}
+                  >
+                    Link Equipment
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Backdrop for mobile — tap outside to close */}
+      {selected && (
+        <div
+          className="absolute inset-0 z-[1999] md:hidden"
+          onClick={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
