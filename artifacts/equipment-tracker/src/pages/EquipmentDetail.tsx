@@ -10,7 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, MapPin, HardDrive, Clock, Tag, FileText, ArrowLeft, QrCode, Download, ScanLine, CalendarCheck, CalendarX, Trash2, ClipboardList, Map } from "lucide-react";
+import { AlertTriangle, MapPin, HardDrive, Clock, Tag, FileText, ArrowLeft, QrCode, Download, ScanLine, CalendarCheck, CalendarX, Trash2, ClipboardList, Map, Printer } from "lucide-react";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
 import { EquipmentFormDialog } from "@/components/EquipmentFormDialog";
 import { AddLogDialog } from "@/components/AddLogDialog";
@@ -318,6 +318,16 @@ export default function EquipmentDetail() {
                 </Button>
               </Link>
             )}
+            <Link href={`/equipment/${equipmentId}/print`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="font-mono text-xs uppercase tracking-wider rounded-none gap-1.5 border-border hover:text-primary"
+                title="Print service record"
+              >
+                <Printer className="h-3.5 w-3.5" /> Print
+              </Button>
+            </Link>
             <EquipmentFormDialog tileUuid={equipment.tileUuid} existingEquipment={equipment} />
           </div>
         </div>

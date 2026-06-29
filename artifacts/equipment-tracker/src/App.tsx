@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import MapPage from "./pages/MapPage";
 import EquipmentList from "./pages/EquipmentList";
 import EquipmentDetail from "./pages/EquipmentDetail";
+import EquipmentPrintPage from "./pages/EquipmentPrintPage";
 import Settings from "./pages/Settings";
 import ScanPage from "./pages/ScanPage";
 import ScannerPage from "./pages/ScannerPage";
@@ -19,8 +20,9 @@ const queryClient = new QueryClient();
 function Router() {
   return (
     <Switch>
-      {/* Public scan landing page — no sidebar */}
+      {/* Standalone pages — no sidebar */}
       <Route path="/scan/:token" component={ScanPage} />
+      <Route path="/equipment/:id/print" component={EquipmentPrintPage} />
 
       {/* App pages with sidebar */}
       <Route>
