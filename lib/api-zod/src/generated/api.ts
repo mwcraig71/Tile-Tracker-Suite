@@ -273,6 +273,164 @@ export const DeleteEquipmentLogResponse = zod.void()
 
 
 /**
+ * @summary List components for equipment
+ */
+export const ListComponentsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListComponentsResponseItem = zod.object({
+  "id": zod.number(),
+  "parentEquipmentId": zod.number(),
+  "name": zod.string(),
+  "componentType": zod.string(),
+  "serialNumber": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "inServiceDate": zod.string().nullish(),
+  "outOfServiceDate": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListComponentsResponse = zod.array(ListComponentsResponseItem)
+
+
+/**
+ * @summary Add a component to equipment
+ */
+export const CreateComponentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateComponentBody = zod.object({
+  "name": zod.string(),
+  "componentType": zod.string(),
+  "serialNumber": zod.string().optional(),
+  "notes": zod.string().optional(),
+  "inServiceDate": zod.string().optional(),
+  "outOfServiceDate": zod.string().optional()
+})
+
+export const CreateComponentResponse = zod.object({
+  "id": zod.number(),
+  "parentEquipmentId": zod.number(),
+  "name": zod.string(),
+  "componentType": zod.string(),
+  "serialNumber": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "inServiceDate": zod.string().nullish(),
+  "outOfServiceDate": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Update a component
+ */
+export const UpdateComponentParams = zod.object({
+  "id": zod.coerce.number(),
+  "componentId": zod.coerce.number()
+})
+
+export const UpdateComponentBody = zod.object({
+  "name": zod.string(),
+  "componentType": zod.string(),
+  "serialNumber": zod.string().optional(),
+  "notes": zod.string().optional(),
+  "inServiceDate": zod.string().optional(),
+  "outOfServiceDate": zod.string().optional()
+})
+
+export const UpdateComponentResponse = zod.object({
+  "id": zod.number(),
+  "parentEquipmentId": zod.number(),
+  "name": zod.string(),
+  "componentType": zod.string(),
+  "serialNumber": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "inServiceDate": zod.string().nullish(),
+  "outOfServiceDate": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a component
+ */
+export const DeleteComponentParams = zod.object({
+  "id": zod.coerce.number(),
+  "componentId": zod.coerce.number()
+})
+
+export const DeleteComponentResponse = zod.void()
+
+
+/**
+ * @summary Get service logs for a component
+ */
+export const ListComponentLogsParams = zod.object({
+  "id": zod.coerce.number(),
+  "componentId": zod.coerce.number()
+})
+
+export const ListComponentLogsResponseItem = zod.object({
+  "id": zod.number(),
+  "componentId": zod.number(),
+  "logType": zod.string(),
+  "logDate": zod.string(),
+  "durationMinutes": zod.number().nullish(),
+  "operatorName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListComponentLogsResponse = zod.array(ListComponentLogsResponseItem)
+
+
+/**
+ * @summary Add a service log entry to a component
+ */
+export const CreateComponentLogParams = zod.object({
+  "id": zod.coerce.number(),
+  "componentId": zod.coerce.number()
+})
+
+export const CreateComponentLogBody = zod.object({
+  "logType": zod.string(),
+  "logDate": zod.string(),
+  "durationMinutes": zod.number().optional(),
+  "operatorName": zod.string().optional(),
+  "location": zod.string().optional(),
+  "notes": zod.string().optional()
+})
+
+export const CreateComponentLogResponse = zod.object({
+  "id": zod.number(),
+  "componentId": zod.number(),
+  "logType": zod.string(),
+  "logDate": zod.string(),
+  "durationMinutes": zod.number().nullish(),
+  "operatorName": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a component log entry
+ */
+export const DeleteComponentLogParams = zod.object({
+  "id": zod.coerce.number(),
+  "componentId": zod.coerce.number(),
+  "logId": zod.coerce.number()
+})
+
+export const DeleteComponentLogResponse = zod.void()
+
+
+/**
  * @summary Get dashboard summary stats
  */
 export const GetDashboardSummaryResponse = zod.object({

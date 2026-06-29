@@ -167,6 +167,57 @@ export interface EquipmentLogInput {
   notes?: string;
 }
 
+export interface EquipmentComponent {
+  id: number;
+  parentEquipmentId: number;
+  name: string;
+  componentType: string;
+  /** @nullable */
+  serialNumber?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  inServiceDate?: string | null;
+  /** @nullable */
+  outOfServiceDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComponentInput {
+  name: string;
+  componentType: string;
+  serialNumber?: string;
+  notes?: string;
+  inServiceDate?: string;
+  outOfServiceDate?: string;
+}
+
+export interface ComponentLog {
+  id: number;
+  componentId: number;
+  logType: string;
+  logDate: string;
+  /** @nullable */
+  durationMinutes?: number | null;
+  /** @nullable */
+  operatorName?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface ComponentLogInput {
+  logType: string;
+  logDate: string;
+  durationMinutes?: number;
+  operatorName?: string;
+  location?: string;
+  notes?: string;
+}
+
 export interface QrLookupResult {
   equipment: Equipment;
   tile?: TileDevice | null;

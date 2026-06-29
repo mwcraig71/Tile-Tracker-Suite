@@ -14,6 +14,7 @@ import { AlertTriangle, MapPin, HardDrive, Clock, Tag, FileText, ArrowLeft, QrCo
 import { TileStatusBadge } from "@/components/TileStatusBadge";
 import { EquipmentFormDialog } from "@/components/EquipmentFormDialog";
 import { AddLogDialog } from "@/components/AddLogDialog";
+import { ComponentsSection } from "@/components/ComponentsSection";
 import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import { getTileIcon, getHistoryPointIcon } from "@/lib/map-icons";
 import { Link } from "wouter";
@@ -429,6 +430,9 @@ export default function EquipmentDetail() {
 
           {/* Use Log */}
           <UseLogs equipmentId={equipmentId} category={equipment.category} />
+
+          {/* Components */}
+          <ComponentsSection equipmentId={equipmentId} category={equipment.category} />
 
           {/* QR Scan History */}
           <QrScanHistory equipmentId={equipmentId} />

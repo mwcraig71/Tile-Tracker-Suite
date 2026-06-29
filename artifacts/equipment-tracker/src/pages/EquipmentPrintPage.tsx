@@ -4,10 +4,14 @@ import {
   useGetTiles, getGetTilesQueryKey,
   useListEquipmentLogs, getListEquipmentLogsQueryKey,
   useListQrScans, getListQrScansQueryKey,
+  useListComponents, getListComponentsQueryKey,
+  useListComponentLogs, getListComponentLogsQueryKey,
 } from "@workspace/api-client-react";
+import type { EquipmentComponent } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Printer, ArrowLeft } from "lucide-react";
+import { componentTypeLabel } from "@/components/ComponentFormDialog";
 
 const LOG_TYPE_LABELS: Record<string, string> = {
   flight: "Flight",
@@ -30,6 +34,89 @@ function fmtDuration(mins: number | null | undefined) {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+const COMPONENT_LOG_LABELS: Record<string, string> = {
+  maintenance: "Maintenance",
+  inspection: "Inspection",
+  charge: "Charge Cycle",
+  replacement: "Replacement",
+  general: "General Use",
+};
+
+function ComponentPrintRow({ equipmentId, component, index }: { equipmentId: number; component: EquipmentComponent; index: number }) {
+  const { data: logs } = useListComponentLogs(equipmentId, component.id, {
+    query: { queryKey: getListComponentLogsQueryKey(equipmentId, component.id) }
+  });
+
+  const isRetired = !!component.outOfServiceDate && new Date(component.outOfServiceDate) <= new Date();
+  const totalMins = logs?.reduce((s, l) => s + (l.durationMinutes ?? 0), 0) ?? 0;
+
+  return (
+    <div className={`mb-4 ${index > 0 ? "pt-2 border-t border-border/50 print:border-gray-200" : ""}`}>
+      <div className="flex items-baseline gap-3 mb-1.5">
+        <span className="font-bold text-foreground print:text-black">{component.name}</span>
+        <span className="text-xs text-muted-foreground print:text-gray-500 uppercase tracking-wider">
+          {componentTypeLabel(component.componentType)}
+        </span>
+        {isRetired && <span className="text-xs text-destructive print:text-red-600">[Retired]</span>}
+        {component.serialNumber && (
+          <span className="text-xs text-muted-foreground print:text-gray-500">SN: {component.serialNumber}</span>
+        )}
+        {component.inServiceDate && (
+          <span className="text-xs text-muted-foreground print:text-gray-500">
+            In: {fmtDate(component.inServiceDate)}
+          </span>
+        )}
+        {component.outOfServiceDate && (
+          <span className="text-xs text-muted-foreground print:text-gray-500">
+            Out: {fmtDate(component.outOfServiceDate)}
+          </span>
+        )}
+      </div>
+      {component.notes && (
+        <p className="text-xs text-muted-foreground print:text-gray-500 italic mb-1.5">{component.notes}</p>
+      )}
+
+      {logs && logs.length > 0 ? (
+        <table className="w-full text-xs border-collapse ml-2">
+          <thead>
+            <tr className="bg-muted/30 print:bg-gray-50">
+              <th className="text-left py-1 px-2 border border-border/30 print:border-gray-200 font-medium text-muted-foreground print:text-gray-600">Date</th>
+              <th className="text-left py-1 px-2 border border-border/30 print:border-gray-200 font-medium text-muted-foreground print:text-gray-600">Event</th>
+              <th className="text-left py-1 px-2 border border-border/30 print:border-gray-200 font-medium text-muted-foreground print:text-gray-600">Duration</th>
+              <th className="text-left py-1 px-2 border border-border/30 print:border-gray-200 font-medium text-muted-foreground print:text-gray-600">Operator</th>
+              <th className="text-left py-1 px-2 border border-border/30 print:border-gray-200 font-medium text-muted-foreground print:text-gray-600">Location</th>
+              <th className="text-left py-1 px-2 border border-border/30 print:border-gray-200 font-medium text-muted-foreground print:text-gray-600">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...logs].reverse().map((log, i) => (
+              <tr key={log.id} className={i % 2 === 0 ? "" : "bg-muted/10 print:bg-gray-50"}>
+                <td className="py-1 px-2 border border-border/30 print:border-gray-200 whitespace-nowrap">{fmtDate(log.logDate)}</td>
+                <td className="py-1 px-2 border border-border/30 print:border-gray-200">{COMPONENT_LOG_LABELS[log.logType] || log.logType}</td>
+                <td className="py-1 px-2 border border-border/30 print:border-gray-200 whitespace-nowrap">{fmtDuration(log.durationMinutes)}</td>
+                <td className="py-1 px-2 border border-border/30 print:border-gray-200">{log.operatorName || "—"}</td>
+                <td className="py-1 px-2 border border-border/30 print:border-gray-200">{log.location || "—"}</td>
+                <td className="py-1 px-2 border border-border/30 print:border-gray-200 text-muted-foreground print:text-gray-600">{log.notes || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+          {totalMins > 0 && (
+            <tfoot>
+              <tr className="bg-muted/40 print:bg-gray-100 font-bold">
+                <td colSpan={2} className="py-1 px-2 border border-border/30 print:border-gray-200 text-[10px] uppercase">Total</td>
+                <td className="py-1 px-2 border border-border/30 print:border-gray-200">{fmtDuration(totalMins)}</td>
+                <td colSpan={3} className="border border-border/30 print:border-gray-200" />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      ) : (
+        <p className="text-xs text-muted-foreground print:text-gray-400 italic ml-2">No service log entries.</p>
+      )}
+    </div>
+  );
+}
+
 export default function EquipmentPrintPage() {
   const { id } = useParams<{ id: string }>();
   const equipmentId = parseInt(id || "0", 10);
@@ -43,6 +130,9 @@ export default function EquipmentPrintPage() {
   });
   const { data: scans } = useListQrScans(equipmentId, {
     query: { queryKey: getListQrScansQueryKey(equipmentId), enabled: !isNaN(equipmentId) }
+  });
+  const { data: components } = useListComponents(equipmentId, {
+    query: { queryKey: getListComponentsQueryKey(equipmentId), enabled: !isNaN(equipmentId) }
   });
 
   const tile = tiles?.find(t => t.uuid === equipment?.tileUuid);
@@ -222,6 +312,28 @@ export default function EquipmentPrintPage() {
             </table>
           )}
         </section>
+
+        {/* Components */}
+        {components && components.length > 0 && (
+          <section>
+            <div className="flex items-baseline justify-between border-b border-border print:border-gray-300 pb-1 mb-3">
+              <h2 className="text-xs uppercase tracking-widest text-muted-foreground print:text-gray-500">
+                Components
+              </h2>
+              <span className="text-xs text-muted-foreground print:text-gray-500">
+                {components.length} {components.length === 1 ? "component" : "components"}
+              </span>
+            </div>
+            {components.map((component, i) => (
+              <ComponentPrintRow
+                key={component.id}
+                equipmentId={equipmentId}
+                component={component}
+                index={i}
+              />
+            ))}
+          </section>
+        )}
 
         {/* QR Scan history (brief) */}
         {scans && scans.length > 0 && (

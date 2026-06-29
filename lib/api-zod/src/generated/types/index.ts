@@ -7,8 +7,12 @@
  */
 
 export * from './categoryCount';
+export * from './componentInput';
+export * from './componentLog';
+export * from './componentLogInput';
 export * from './dashboardSummary';
 export * from './equipment';
+export * from './equipmentComponent';
 export * from './equipmentInput';
 export * from './equipmentLog';
 export * from './equipmentLogInput';

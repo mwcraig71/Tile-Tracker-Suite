@@ -20,8 +20,12 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ComponentInput,
+  ComponentLog,
+  ComponentLogInput,
   DashboardSummary,
   Equipment,
+  EquipmentComponent,
   EquipmentInput,
   EquipmentLog,
   EquipmentLogInput,
@@ -955,6 +959,528 @@ export const useDeleteEquipmentLog = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getDeleteEquipmentLogMutationOptions(options));
+    }
+
+export const getListComponentsUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipment/${id}/components`
+}
+
+/**
+ * @summary List components for equipment
+ */
+export const listComponents = async (id: number, options?: RequestInit): Promise<EquipmentComponent[]> => {
+
+  return customFetch<EquipmentComponent[]>(getListComponentsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListComponentsQueryKey = (id: number,) => {
+    return [
+    `/api/equipment/${id}/components`
+    ] as const;
+    }
+
+
+export const getListComponentsQueryOptions = <TData = Awaited<ReturnType<typeof listComponents>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listComponents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListComponentsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listComponents>>> = ({ signal }) => listComponents(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listComponents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListComponentsQueryResult = NonNullable<Awaited<ReturnType<typeof listComponents>>>
+export type ListComponentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List components for equipment
+ */
+
+export function useListComponents<TData = Awaited<ReturnType<typeof listComponents>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listComponents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListComponentsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateComponentUrl = (id: number,) => {
+
+
+
+
+  return `/api/equipment/${id}/components`
+}
+
+/**
+ * @summary Add a component to equipment
+ */
+export const createComponent = async (id: number,
+    componentInput: ComponentInput, options?: RequestInit): Promise<EquipmentComponent> => {
+
+  return customFetch<EquipmentComponent>(getCreateComponentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(componentInput)
+  }
+);}
+
+
+
+
+export const getCreateComponentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createComponent>>, TError,{id: number;data: BodyType<ComponentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createComponent>>, TError,{id: number;data: BodyType<ComponentInput>}, TContext> => {
+
+const mutationKey = ['createComponent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createComponent>>, {id: number;data: BodyType<ComponentInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createComponent(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateComponentMutationResult = NonNullable<Awaited<ReturnType<typeof createComponent>>>
+    export type CreateComponentMutationBody = BodyType<ComponentInput>
+    export type CreateComponentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a component to equipment
+ */
+export const useCreateComponent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createComponent>>, TError,{id: number;data: BodyType<ComponentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createComponent>>,
+        TError,
+        {id: number;data: BodyType<ComponentInput>},
+        TContext
+      > => {
+      return useMutation(getCreateComponentMutationOptions(options));
+    }
+
+export const getUpdateComponentUrl = (id: number,
+    componentId: number,) => {
+
+
+
+
+  return `/api/equipment/${id}/components/${componentId}`
+}
+
+/**
+ * @summary Update a component
+ */
+export const updateComponent = async (id: number,
+    componentId: number,
+    componentInput: ComponentInput, options?: RequestInit): Promise<EquipmentComponent> => {
+
+  return customFetch<EquipmentComponent>(getUpdateComponentUrl(id,componentId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(componentInput)
+  }
+);}
+
+
+
+
+export const getUpdateComponentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateComponent>>, TError,{id: number;componentId: number;data: BodyType<ComponentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateComponent>>, TError,{id: number;componentId: number;data: BodyType<ComponentInput>}, TContext> => {
+
+const mutationKey = ['updateComponent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateComponent>>, {id: number;componentId: number;data: BodyType<ComponentInput>}> = (props) => {
+          const {id,componentId,data} = props ?? {};
+
+          return  updateComponent(id,componentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateComponentMutationResult = NonNullable<Awaited<ReturnType<typeof updateComponent>>>
+    export type UpdateComponentMutationBody = BodyType<ComponentInput>
+    export type UpdateComponentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a component
+ */
+export const useUpdateComponent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateComponent>>, TError,{id: number;componentId: number;data: BodyType<ComponentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateComponent>>,
+        TError,
+        {id: number;componentId: number;data: BodyType<ComponentInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateComponentMutationOptions(options));
+    }
+
+export const getDeleteComponentUrl = (id: number,
+    componentId: number,) => {
+
+
+
+
+  return `/api/equipment/${id}/components/${componentId}`
+}
+
+/**
+ * @summary Delete a component
+ */
+export const deleteComponent = async (id: number,
+    componentId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteComponentUrl(id,componentId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteComponentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteComponent>>, TError,{id: number;componentId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteComponent>>, TError,{id: number;componentId: number}, TContext> => {
+
+const mutationKey = ['deleteComponent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteComponent>>, {id: number;componentId: number}> = (props) => {
+          const {id,componentId} = props ?? {};
+
+          return  deleteComponent(id,componentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteComponentMutationResult = NonNullable<Awaited<ReturnType<typeof deleteComponent>>>
+
+    export type DeleteComponentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a component
+ */
+export const useDeleteComponent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteComponent>>, TError,{id: number;componentId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteComponent>>,
+        TError,
+        {id: number;componentId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteComponentMutationOptions(options));
+    }
+
+export const getListComponentLogsUrl = (id: number,
+    componentId: number,) => {
+
+
+
+
+  return `/api/equipment/${id}/components/${componentId}/logs`
+}
+
+/**
+ * @summary Get service logs for a component
+ */
+export const listComponentLogs = async (id: number,
+    componentId: number, options?: RequestInit): Promise<ComponentLog[]> => {
+
+  return customFetch<ComponentLog[]>(getListComponentLogsUrl(id,componentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListComponentLogsQueryKey = (id: number,
+    componentId: number,) => {
+    return [
+    `/api/equipment/${id}/components/${componentId}/logs`
+    ] as const;
+    }
+
+
+export const getListComponentLogsQueryOptions = <TData = Awaited<ReturnType<typeof listComponentLogs>>, TError = ErrorType<unknown>>(id: number,
+    componentId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listComponentLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListComponentLogsQueryKey(id,componentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listComponentLogs>>> = ({ signal }) => listComponentLogs(id,componentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined && componentId !== null && componentId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listComponentLogs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListComponentLogsQueryResult = NonNullable<Awaited<ReturnType<typeof listComponentLogs>>>
+export type ListComponentLogsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get service logs for a component
+ */
+
+export function useListComponentLogs<TData = Awaited<ReturnType<typeof listComponentLogs>>, TError = ErrorType<unknown>>(
+ id: number,
+    componentId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listComponentLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListComponentLogsQueryOptions(id,componentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateComponentLogUrl = (id: number,
+    componentId: number,) => {
+
+
+
+
+  return `/api/equipment/${id}/components/${componentId}/logs`
+}
+
+/**
+ * @summary Add a service log entry to a component
+ */
+export const createComponentLog = async (id: number,
+    componentId: number,
+    componentLogInput: ComponentLogInput, options?: RequestInit): Promise<ComponentLog> => {
+
+  return customFetch<ComponentLog>(getCreateComponentLogUrl(id,componentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(componentLogInput)
+  }
+);}
+
+
+
+
+export const getCreateComponentLogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createComponentLog>>, TError,{id: number;componentId: number;data: BodyType<ComponentLogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createComponentLog>>, TError,{id: number;componentId: number;data: BodyType<ComponentLogInput>}, TContext> => {
+
+const mutationKey = ['createComponentLog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createComponentLog>>, {id: number;componentId: number;data: BodyType<ComponentLogInput>}> = (props) => {
+          const {id,componentId,data} = props ?? {};
+
+          return  createComponentLog(id,componentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateComponentLogMutationResult = NonNullable<Awaited<ReturnType<typeof createComponentLog>>>
+    export type CreateComponentLogMutationBody = BodyType<ComponentLogInput>
+    export type CreateComponentLogMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a service log entry to a component
+ */
+export const useCreateComponentLog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createComponentLog>>, TError,{id: number;componentId: number;data: BodyType<ComponentLogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createComponentLog>>,
+        TError,
+        {id: number;componentId: number;data: BodyType<ComponentLogInput>},
+        TContext
+      > => {
+      return useMutation(getCreateComponentLogMutationOptions(options));
+    }
+
+export const getDeleteComponentLogUrl = (id: number,
+    componentId: number,
+    logId: number,) => {
+
+
+
+
+  return `/api/equipment/${id}/components/${componentId}/logs/${logId}`
+}
+
+/**
+ * @summary Delete a component log entry
+ */
+export const deleteComponentLog = async (id: number,
+    componentId: number,
+    logId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteComponentLogUrl(id,componentId,logId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteComponentLogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteComponentLog>>, TError,{id: number;componentId: number;logId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteComponentLog>>, TError,{id: number;componentId: number;logId: number}, TContext> => {
+
+const mutationKey = ['deleteComponentLog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteComponentLog>>, {id: number;componentId: number;logId: number}> = (props) => {
+          const {id,componentId,logId} = props ?? {};
+
+          return  deleteComponentLog(id,componentId,logId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteComponentLogMutationResult = NonNullable<Awaited<ReturnType<typeof deleteComponentLog>>>
+
+    export type DeleteComponentLogMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a component log entry
+ */
+export const useDeleteComponentLog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteComponentLog>>, TError,{id: number;componentId: number;logId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteComponentLog>>,
+        TError,
+        {id: number;componentId: number;logId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteComponentLogMutationOptions(options));
     }
 
 export const getGetDashboardSummaryUrl = () => {
