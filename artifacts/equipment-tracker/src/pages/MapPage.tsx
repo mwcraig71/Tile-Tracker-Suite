@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGetTiles, getGetTilesQueryKey } from "@workspace/api-client-react";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import type { LatLngBounds, LatLngTuple } from "leaflet";
@@ -6,11 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { getTileIcon } from "@/lib/map-icons";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
-import { Link, useSearch } from "wouter";
+import { Link, useSearch, useLocation } from "wouter";
 import {
   X, MapPin, Clock, Tag, Hash, CalendarCheck, FileText, ExternalLink, Wifi
 } from "lucide-react";
-import { EquipmentFormDialog } from "@/components/EquipmentFormDialog";
 
 type TileDevice = NonNullable<ReturnType<typeof useGetTiles>["data"]>[number];
 
@@ -94,7 +93,7 @@ export default function MapPage() {
 
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
   const [selected, setSelected] = useState<TileDevice | null>(null);
-  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [, navigate] = useLocation();
   const didAutoSelect = useRef(false);
 
   // Set initial bounds from all tiles (only when no target UUID)
@@ -308,7 +307,7 @@ export default function MapPage() {
                 <Button
                   variant="outline"
                   className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
-                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); setTimeout(() => setLinkDialogOpen(true), 0); }}
+                  onClick={() => navigate(`/equipment?linkTile=${selected.uuid}`)}
                 >
                   Link Equipment
                 </Button>
@@ -326,14 +325,6 @@ export default function MapPage() {
         />
       )}
 
-      {/* Link Equipment dialog — rendered at root to avoid Leaflet event conflicts */}
-      {selected && !selected.equipment && (
-        <EquipmentFormDialog
-          tileUuid={selected.uuid}
-          open={linkDialogOpen}
-          onOpenChange={(v) => { setLinkDialogOpen(v); }}
-        />
-      )}
     </div>
   );
 }

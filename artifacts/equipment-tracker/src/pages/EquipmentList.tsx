@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useGetTiles, getGetTilesQueryKey } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, MapPin, HardDrive, Filter, X } from "lucide-react";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
 import { EquipmentFormDialog } from "@/components/EquipmentFormDialog";
-import { Link } from "wouter";
+import { Link, useSearch, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,20 @@ export default function EquipmentList() {
   const [nameFilter, setNameFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(ALL);
   const [cityFilter, setCityFilter] = useState("");
+  const [autoLinkUuid, setAutoLinkUuid] = useState<string | null>(null);
+  const [autoLinkOpen, setAutoLinkOpen] = useState(false);
+  const search = useSearch();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const linkTile = params.get("linkTile");
+    if (linkTile) {
+      setAutoLinkUuid(linkTile);
+      setTimeout(() => setAutoLinkOpen(true), 100);
+      navigate("/equipment", { replace: true });
+    }
+  }, [search]);
 
   const { data: tiles, isLoading } = useGetTiles({
     query: { queryKey: getGetTilesQueryKey() }
@@ -251,7 +265,10 @@ export default function EquipmentList() {
                             </Button>
                           </Link>
                         ) : (
-                          <EquipmentFormDialog tileUuid={tile.uuid} />
+                          <EquipmentFormDialog
+                            tileUuid={tile.uuid}
+                            {...(tile.uuid === autoLinkUuid ? { open: autoLinkOpen, onOpenChange: (v) => setAutoLinkOpen(v) } : {})}
+                          />
                         )}
                       </div>
                     </div>
@@ -357,7 +374,10 @@ export default function EquipmentList() {
                                 </Button>
                               </Link>
                             ) : (
-                              <EquipmentFormDialog tileUuid={tile.uuid} />
+                              <EquipmentFormDialog
+                                tileUuid={tile.uuid}
+                                {...(tile.uuid === autoLinkUuid ? { open: autoLinkOpen, onOpenChange: (v) => setAutoLinkOpen(v) } : {})}
+                              />
                             )}
                           </div>
                         </TableCell>
