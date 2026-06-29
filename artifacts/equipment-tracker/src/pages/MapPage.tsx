@@ -10,6 +10,7 @@ import { Link, useSearch } from "wouter";
 import {
   X, MapPin, Clock, Tag, Hash, CalendarCheck, FileText, ExternalLink, Wifi
 } from "lucide-react";
+import { EquipmentFormDialog } from "@/components/EquipmentFormDialog";
 
 type TileDevice = NonNullable<ReturnType<typeof useGetTiles>["data"]>[number];
 
@@ -303,15 +304,17 @@ export default function MapPage() {
                   </Button>
                 </Link>
               ) : (
-                <Link href="/equipment">
-                  <Button
-                    variant="outline"
-                    className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
-                    onClick={() => setSelected(null)}
-                  >
-                    Link Equipment
-                  </Button>
-                </Link>
+                <EquipmentFormDialog
+                  tileUuid={selected.uuid}
+                  trigger={
+                    <Button
+                      variant="outline"
+                      className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
+                    >
+                      Link Equipment
+                    </Button>
+                  }
+                />
               )}
             </div>
           </div>
