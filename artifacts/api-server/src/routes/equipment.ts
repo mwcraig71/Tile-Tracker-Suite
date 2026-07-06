@@ -1,5 +1,10 @@
 import { Router } from "express";
-import { db, equipmentTable } from "@workspace/db";
+import {
+  db,
+  equipmentTable,
+  insertEquipmentSchema,
+  updateEquipmentSchema,
+} from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
@@ -11,17 +16,26 @@ function parseDate(v: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function sanitizeBody(body: Record<string, unknown>) {
-  return {
-    ...body,
-    inServiceDate: parseDate(body.inServiceDate),
-    outOfServiceDate: parseDate(body.outOfServiceDate),
-    // Null out empty strings for optional fields
-    customQrCode: body.customQrCode || null,
-    description: body.description || null,
-    serialNumber: body.serialNumber || null,
-    notes: body.notes || null,
-  };
+const DATE_FIELDS = ["inServiceDate", "outOfServiceDate"] as const;
+const NULLABLE_TEXT_FIELDS = ["customQrCode", "description", "serialNumber", "notes"] as const;
+
+/**
+ * Normalize the raw request body ahead of Zod validation: convert date
+ * strings to Date objects and empty strings to null for optional fields.
+ * Only fields present in the body are touched, so partial updates do not
+ * clobber unspecified columns. Field whitelisting (mass-assignment
+ * protection) is done by the Zod schemas, which strip unknown keys such
+ * as id, qrToken, and createdAt.
+ */
+function normalizeBody(body: Record<string, unknown>) {
+  const out: Record<string, unknown> = { ...body };
+  for (const field of DATE_FIELDS) {
+    if (field in out) out[field] = parseDate(out[field]);
+  }
+  for (const field of NULLABLE_TEXT_FIELDS) {
+    if (field in out) out[field] = out[field] || null;
+  }
+  return out;
 }
 
 equipmentRouter.get("/", async (_req, res) => {
@@ -36,31 +50,31 @@ equipmentRouter.get("/", async (_req, res) => {
 
 equipmentRouter.post("/", async (req, res) => {
   try {
-    const { tileUuid, label, category } = req.body;
-    if (!tileUuid || !label || !category) {
-      res.status(400).json({ error: "tileUuid, label, and category are required" });
+    const parsed = insertEquipmentSchema.safeParse(normalizeBody(req.body));
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid equipment payload", details: parsed.error.issues });
       return;
     }
-
-    const data = sanitizeBody(req.body);
+    const data = parsed.data;
 
     const existing = await db
       .select()
       .from(equipmentTable)
-      .where(eq(equipmentTable.tileUuid, tileUuid))
+      .where(eq(equipmentTable.tileUuid, data.tileUuid))
       .limit(1);
 
     if (existing.length > 0) {
+      const { tileUuid: _tileUuid, ...updateData } = data;
       const [updated] = await db
         .update(equipmentTable)
-        .set({ ...data, updatedAt: new Date() } as any)
-        .where(eq(equipmentTable.tileUuid, tileUuid))
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(equipmentTable.tileUuid, data.tileUuid))
         .returning();
-      res.status(201).json(updated);
+      res.status(200).json(updated);
     } else {
       const [created] = await db
         .insert(equipmentTable)
-        .values(data as any)
+        .values(data)
         .returning();
       res.status(201).json(created);
     }
@@ -88,11 +102,15 @@ equipmentRouter.patch("/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-    const data = sanitizeBody(req.body);
+    const parsed = updateEquipmentSchema.safeParse(normalizeBody(req.body));
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid equipment payload", details: parsed.error.issues });
+      return;
+    }
 
     const [updated] = await db
       .update(equipmentTable)
-      .set({ ...data, updatedAt: new Date() } as any)
+      .set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(equipmentTable.id, id))
       .returning();
 

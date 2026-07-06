@@ -1,7 +1,13 @@
 import { Router } from "express";
 import { db, equipmentTable, equipmentComponentsTable, componentLogsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { logger } from "../lib/logger";
+
+// Express 5 typings do not infer params merged from the parent router
+// (mergeParams), so pull the parent :id out with an explicit cast.
+function parentEquipmentId(req: { params: unknown }): number {
+  return parseInt((req.params as { id?: string }).id ?? "", 10);
+}
 
 export const equipmentComponentsRouter = Router({ mergeParams: true });
 
@@ -15,7 +21,7 @@ function parseDate(val: unknown): Date | null {
 
 equipmentComponentsRouter.get("/", async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parentEquipmentId(req);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
     const [equipment] = await db.select().from(equipmentTable).where(eq(equipmentTable.id, id)).limit(1);
@@ -36,7 +42,7 @@ equipmentComponentsRouter.get("/", async (req, res) => {
 
 equipmentComponentsRouter.post("/", async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parentEquipmentId(req);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
     const [equipment] = await db.select().from(equipmentTable).where(eq(equipmentTable.id, id)).limit(1);
@@ -71,7 +77,7 @@ equipmentComponentsRouter.post("/", async (req, res) => {
 
 equipmentComponentsRouter.patch("/:componentId", async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parentEquipmentId(req);
     const componentId = parseInt(req.params.componentId, 10);
     if (isNaN(id) || isNaN(componentId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -88,7 +94,10 @@ equipmentComponentsRouter.patch("/:componentId", async (req, res) => {
     const [updated] = await db
       .update(equipmentComponentsTable)
       .set(updates)
-      .where(eq(equipmentComponentsTable.id, componentId))
+      .where(and(
+        eq(equipmentComponentsTable.id, componentId),
+        eq(equipmentComponentsTable.parentEquipmentId, id),
+      ))
       .returning();
 
     if (!updated) { res.status(404).json({ error: "Component not found" }); return; }
@@ -101,10 +110,14 @@ equipmentComponentsRouter.patch("/:componentId", async (req, res) => {
 
 equipmentComponentsRouter.delete("/:componentId", async (req, res) => {
   try {
+    const id = parentEquipmentId(req);
     const componentId = parseInt(req.params.componentId, 10);
-    if (isNaN(componentId)) { res.status(400).json({ error: "Invalid id" }); return; }
+    if (isNaN(id) || isNaN(componentId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-    await db.delete(equipmentComponentsTable).where(eq(equipmentComponentsTable.id, componentId));
+    await db.delete(equipmentComponentsTable).where(and(
+      eq(equipmentComponentsTable.id, componentId),
+      eq(equipmentComponentsTable.parentEquipmentId, id),
+    ));
     res.status(204).send();
   } catch (err) {
     logger.error({ err }, "Failed to delete component");
@@ -114,10 +127,26 @@ equipmentComponentsRouter.delete("/:componentId", async (req, res) => {
 
 // ── Component Logs ───────────────────────────────────────────────────────────
 
+async function findScopedComponent(equipmentId: number, componentId: number) {
+  const [component] = await db
+    .select()
+    .from(equipmentComponentsTable)
+    .where(and(
+      eq(equipmentComponentsTable.id, componentId),
+      eq(equipmentComponentsTable.parentEquipmentId, equipmentId),
+    ))
+    .limit(1);
+  return component ?? null;
+}
+
 equipmentComponentsRouter.get("/:componentId/logs", async (req, res) => {
   try {
+    const id = parentEquipmentId(req);
     const componentId = parseInt(req.params.componentId, 10);
-    if (isNaN(componentId)) { res.status(400).json({ error: "Invalid id" }); return; }
+    if (isNaN(id) || isNaN(componentId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+    const component = await findScopedComponent(id, componentId);
+    if (!component) { res.status(404).json({ error: "Component not found" }); return; }
 
     const logs = await db
       .select()
@@ -134,14 +163,11 @@ equipmentComponentsRouter.get("/:componentId/logs", async (req, res) => {
 
 equipmentComponentsRouter.post("/:componentId/logs", async (req, res) => {
   try {
+    const id = parentEquipmentId(req);
     const componentId = parseInt(req.params.componentId, 10);
-    if (isNaN(componentId)) { res.status(400).json({ error: "Invalid id" }); return; }
+    if (isNaN(id) || isNaN(componentId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-    const [component] = await db
-      .select()
-      .from(equipmentComponentsTable)
-      .where(eq(equipmentComponentsTable.id, componentId))
-      .limit(1);
+    const component = await findScopedComponent(id, componentId);
     if (!component) { res.status(404).json({ error: "Component not found" }); return; }
 
     const { logType, logDate, durationMinutes, operatorName, location, notes } = req.body;
@@ -172,10 +198,18 @@ equipmentComponentsRouter.post("/:componentId/logs", async (req, res) => {
 
 equipmentComponentsRouter.delete("/:componentId/logs/:logId", async (req, res) => {
   try {
+    const id = parentEquipmentId(req);
+    const componentId = parseInt(req.params.componentId, 10);
     const logId = parseInt(req.params.logId, 10);
-    if (isNaN(logId)) { res.status(400).json({ error: "Invalid id" }); return; }
+    if (isNaN(id) || isNaN(componentId) || isNaN(logId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-    await db.delete(componentLogsTable).where(eq(componentLogsTable.id, logId));
+    const component = await findScopedComponent(id, componentId);
+    if (!component) { res.status(404).json({ error: "Component not found" }); return; }
+
+    await db.delete(componentLogsTable).where(and(
+      eq(componentLogsTable.id, logId),
+      eq(componentLogsTable.componentId, componentId),
+    ));
     res.status(204).send();
   } catch (err) {
     logger.error({ err }, "Failed to delete component log");

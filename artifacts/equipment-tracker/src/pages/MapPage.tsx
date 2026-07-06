@@ -11,7 +11,7 @@ import {
   X, MapPin, Clock, Tag, Hash, CalendarCheck, FileText, ExternalLink, Wifi
 } from "lucide-react";
 
-type TileDevice = NonNullable<ReturnType<typeof useGetTiles>["data"]>[number];
+import type { TileDevice } from "@workspace/api-client-react";
 
 function MapController({ bounds }: { bounds: LatLngBounds | null }) {
   const map = useMap();

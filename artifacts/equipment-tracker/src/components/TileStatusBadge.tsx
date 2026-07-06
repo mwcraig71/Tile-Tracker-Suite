@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { TileDevice } from "@workspace/api-client-react/src/generated/api.schemas";
+import type { TileDevice } from "@workspace/api-client-react";
 
 interface TileStatusBadgeProps {
   tile: Pick<TileDevice, "lost" | "dead">;

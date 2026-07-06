@@ -1,13 +1,19 @@
 import { Router } from "express";
 import { db, equipmentTable, equipmentLogsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { logger } from "../lib/logger";
+
+// Express 5 typings do not infer params merged from the parent router
+// (mergeParams), so pull the parent :id out with an explicit cast.
+function parentEquipmentId(req: { params: unknown }): number {
+  return parseInt((req.params as { id?: string }).id ?? "", 10);
+}
 
 export const equipmentLogsRouter = Router({ mergeParams: true });
 
 equipmentLogsRouter.get("/", async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parentEquipmentId(req);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
     const [equipment] = await db.select().from(equipmentTable).where(eq(equipmentTable.id, id)).limit(1);
@@ -28,7 +34,7 @@ equipmentLogsRouter.get("/", async (req, res) => {
 
 equipmentLogsRouter.post("/", async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parentEquipmentId(req);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
     const [equipment] = await db.select().from(equipmentTable).where(eq(equipmentTable.id, id)).limit(1);
@@ -63,13 +69,13 @@ equipmentLogsRouter.post("/", async (req, res) => {
 
 equipmentLogsRouter.delete("/:logId", async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parentEquipmentId(req);
     const logId = parseInt(req.params.logId, 10);
     if (isNaN(id) || isNaN(logId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
     await db
       .delete(equipmentLogsTable)
-      .where(eq(equipmentLogsTable.id, logId));
+      .where(and(eq(equipmentLogsTable.id, logId), eq(equipmentLogsTable.equipmentId, id)));
 
     res.status(204).send();
   } catch (err) {

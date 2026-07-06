@@ -13,8 +13,8 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
       signal: AbortSignal.timeout(5000),
     });
     if (!resp.ok) return null;
-    const data = await resp.json();
-    const addr = data.address || {};
+    const data = (await resp.json()) as { address?: Record<string, string | undefined> };
+    const addr = data.address ?? {};
     return addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state || null;
   } catch {
     return null;
@@ -115,7 +115,7 @@ export const equipmentScansRouter = Router({ mergeParams: true });
 
 equipmentScansRouter.get("/", async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt((req.params as { id?: string }).id ?? "", 10);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
     const [equipment] = await db.select().from(equipmentTable).where(eq(equipmentTable.id, id)).limit(1);

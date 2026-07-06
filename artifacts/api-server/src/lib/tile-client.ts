@@ -40,6 +40,16 @@ interface HistoryEntry {
   timestamp: number;
 }
 
+/**
+ * Tile API timestamps are inconsistent: some endpoints return epoch
+ * milliseconds, others epoch seconds. Normalize everything to ms.
+ * (Anything below 1e12 would be a date before Sep 2001 in ms, so treat
+ * it as seconds.)
+ */
+function toEpochMs(ts: number): number {
+  return ts < 1e12 ? ts * 1000 : ts;
+}
+
 let sessionExpiry: number | null = null;
 let clientEstablished = false;
 const clientUuid = randomUUID();
@@ -109,18 +119,21 @@ async function tileRequest(
 
   const resp = await fetch(url, options);
 
-  // Persist any Set-Cookie headers
-  const setCookieHeader = resp.headers.get("set-cookie");
-  if (setCookieHeader) {
-    // Parse cookies and add to our jar (overwrite existing keys)
-    const newCookies = setCookieHeader.split(/,(?=[^ ])/);
-    for (const cookieFull of newCookies) {
-      const cookiePart = cookieFull.split(";")[0].trim();
-      const [key] = cookiePart.split("=");
-      // Remove existing cookie with same key and add the new one
-      sessionCookies = sessionCookies.filter((c) => !c.startsWith(key + "="));
-      sessionCookies.push(cookiePart);
-    }
+  // Persist any Set-Cookie headers. Use getSetCookie() (Node 18.14+/undici),
+  // which returns one entry per Set-Cookie header — Headers.get("set-cookie")
+  // folds them into a single comma-joined string that breaks on cookies
+  // containing commas (e.g. Expires attributes).
+  const newCookies: string[] =
+    typeof resp.headers.getSetCookie === "function"
+      ? resp.headers.getSetCookie()
+      : resp.headers.get("set-cookie")?.split(/,(?=\s*[^\s=;]+=)/) ?? [];
+  for (const cookieFull of newCookies) {
+    const cookiePart = cookieFull.split(";")[0]?.trim();
+    if (!cookiePart || !cookiePart.includes("=")) continue;
+    const [key] = cookiePart.split("=");
+    // Remove existing cookie with same key and add the new one
+    sessionCookies = sessionCookies.filter((c) => !c.startsWith(key + "="));
+    sessionCookies.push(cookiePart);
   }
 
   if (!resp.ok) {
@@ -167,7 +180,9 @@ export async function initSession(): Promise<void> {
     password,
   }) as { result: { session_expiration_timestamp: number; user: { user_uuid: string } } };
 
-  sessionExpiry = resp.result.session_expiration_timestamp;
+  // Tile returns this in epoch seconds; normalize to ms so the
+  // Date.now() comparison in ensureSession() works.
+  sessionExpiry = toEpochMs(resp.result.session_expiration_timestamp);
   logger.info({ expires: sessionExpiry, cookies: sessionCookies.length }, "Tile session initialized");
 }
 
@@ -226,7 +241,7 @@ export async function getTiles(): Promise<TileDevice[]> {
       longitude: state ? state.longitude : null,
       altitude: state ? state.altitude : null,
       accuracy: state ? state.h_accuracy : null,
-      lastSeen: state ? new Date(state.timestamp).toISOString() : null,
+      lastSeen: state ? new Date(toEpochMs(state.timestamp)).toISOString() : null,
       lost: state ? state.is_lost : true,
       dead: r.is_dead,
       firmwareVersion: r.firmware_version,
@@ -264,7 +279,7 @@ export async function getTileHistory(tileUuid: string): Promise<LocationPoint[]>
       longitude: entry.longitude,
       altitude: entry.altitude ?? null,
       accuracy: entry.h_accuracy ?? null,
-      timestamp: new Date(entry.timestamp).toISOString(),
+      timestamp: new Date(toEpochMs(entry.timestamp)).toISOString(),
     }));
   } catch (err) {
     logger.warn("Could not fetch history for tile %s: %s", tileUuid, err);

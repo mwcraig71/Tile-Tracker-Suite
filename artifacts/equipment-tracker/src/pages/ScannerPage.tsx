@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import jsQR from "jsqr";
-import { useQrLookup } from "@workspace/api-client-react";
+import { useQrLookup, getQrLookupQueryKey } from "@workspace/api-client-react";
 import { Loader2, QrCode, MapPin, Tag, Clock, FileText, ScanLine, ChevronRight, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +31,7 @@ export default function ScannerPage() {
 
   const { data: lookupResult, isLoading: lookupLoading, isError: lookupError, refetch } = useQrLookup(
     { code: lookupCode || "" },
-    { query: { enabled: false, retry: false } }
+    { query: { queryKey: getQrLookupQueryKey({ code: lookupCode || "" }), enabled: false, retry: false } }
   );
 
   function stopCamera() {

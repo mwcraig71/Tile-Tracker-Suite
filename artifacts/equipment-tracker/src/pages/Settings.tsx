@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { RefreshCw, Server, AlertCircle, CheckCircle2, Wifi, WifiOff, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { getAppKey, setAppKey, authHeaders } from "@/lib/app-key";
+import { ShieldCheck } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -31,9 +33,12 @@ export default function Settings() {
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [appKeyInput, setAppKeyInput] = useState("");
+  const [showAppKey, setShowAppKey] = useState(false);
+  const [appKeySet, setAppKeySet] = useState(() => !!getAppKey());
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/settings/credentials`)
+    fetch(`${API_BASE}/api/settings/credentials`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => setCredStatus(d))
       .catch(() => setCredStatus(null));
@@ -46,7 +51,7 @@ export default function Settings() {
     try {
       const res = await fetch(`${API_BASE}/api/settings/credentials`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ email: email.trim(), password: password.trim() }),
       });
       const data = await res.json();
@@ -63,6 +68,20 @@ export default function Settings() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveAppKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAppKey(appKeyInput);
+    setAppKeySet(!!appKeyInput.trim());
+    setAppKeyInput("");
+    toast({
+      title: appKeyInput.trim() ? "Access Key Saved" : "Access Key Cleared",
+      description: appKeyInput.trim()
+        ? "Stored on this device. Reloading data..."
+        : "This device will no longer authenticate.",
+    });
+    await queryClient.invalidateQueries();
   };
 
   const handleRefresh = async () => {
@@ -91,6 +110,57 @@ export default function Settings() {
       </header>
 
       <div className="grid gap-4 md:gap-6">
+
+        {/* App Access Key */}
+        <Card className="border-primary/20 bg-card rounded-none">
+          <CardHeader className="border-b border-border bg-muted/30 py-3 px-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="font-mono uppercase tracking-wider text-xs md:text-sm flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" /> App Access Key
+                </CardTitle>
+                <CardDescription className="font-mono text-xs mt-0.5">
+                  Required to use this app. Matches the APP_API_KEY secret on the server.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-1.5 font-mono text-xs">
+                {appKeySet ? (
+                  <span className="text-green-500 uppercase tracking-wider">Set</span>
+                ) : (
+                  <span className="text-yellow-500 uppercase tracking-wider">Not set</span>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6">
+            <form onSubmit={handleSaveAppKey} className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Input
+                  type={showAppKey ? "text" : "password"}
+                  autoComplete="off"
+                  placeholder={appKeySet ? "•••••••• (saved on this device)" : "Paste access key"}
+                  value={appKeyInput}
+                  onChange={(e) => setAppKeyInput(e.target.value)}
+                  className="font-mono rounded-none bg-background border-border focus-visible:ring-primary text-sm pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAppKey((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showAppKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <Button
+                type="submit"
+                className="font-mono uppercase tracking-wider rounded-none gap-2 w-full sm:w-auto flex-shrink-0"
+              >
+                <KeyRound className="h-4 w-4" /> Save Key
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
 
         {/* Tile Account Credentials */}
         <Card className="border-primary/20 bg-card rounded-none">

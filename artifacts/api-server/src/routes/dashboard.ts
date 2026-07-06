@@ -2,7 +2,6 @@ import { Router } from "express";
 import { getTiles } from "../lib/tile-client";
 import { db, equipmentTable } from "@workspace/db";
 import { logger } from "../lib/logger";
-import { eq } from "drizzle-orm";
 
 export const dashboardRouter = Router();
 
