@@ -26,9 +26,10 @@ tilesRouter.get("/", async (_req, res) => {
     logger.error({ err }, "Failed to fetch tiles");
     const message = err instanceof Error ? err.message : "Unknown error";
     if (message.includes("credentials") || message.includes("Invalid Tile")) {
-      res.status(401).json({ error: "Tile authentication failed. Check TILE_EMAIL and TILE_PASSWORD." });
+      res.status(401).json({ error: "Tile authentication failed. Check your Tile account credentials in Settings." });
     } else {
-      res.status(500).json({ error: message });
+      // Don't leak upstream/internal error detail to the client.
+      res.status(502).json({ error: "Failed to reach the Tile service." });
     }
   }
 });

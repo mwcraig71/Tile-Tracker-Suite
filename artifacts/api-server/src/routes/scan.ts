@@ -5,7 +5,27 @@ import { logger } from "../lib/logger";
 
 export const scanRouter = Router();
 
+// Nominatim's usage policy caps requests at ~1/sec and expects caching.
+// We cache results by coarse (~1km) lat/lng and serialize calls with a
+// minimum interval so a burst of public scans can't hammer the service.
+const GEOCODE_CACHE = new Map<string, { city: string | null; at: number }>();
+const GEOCODE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const GEOCODE_MIN_INTERVAL_MS = 1100;
+let lastGeocodeAt = 0;
+
 async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  // Round to ~3 decimal places (~110m) so nearby scans share a cache entry.
+  const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+  const cached = GEOCODE_CACHE.get(key);
+  if (cached && Date.now() - cached.at < GEOCODE_TTL_MS) {
+    return cached.city;
+  }
+
+  // Respect Nominatim's rate limit by spacing out live calls.
+  const wait = GEOCODE_MIN_INTERVAL_MS - (Date.now() - lastGeocodeAt);
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastGeocodeAt = Date.now();
+
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`;
     const resp = await fetch(url, {
@@ -15,7 +35,10 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
     if (!resp.ok) return null;
     const data = (await resp.json()) as { address?: Record<string, string | undefined> };
     const addr = data.address ?? {};
-    return addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state || null;
+    const city =
+      addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state || null;
+    GEOCODE_CACHE.set(key, { city, at: Date.now() });
+    return city;
   } catch {
     return null;
   }
