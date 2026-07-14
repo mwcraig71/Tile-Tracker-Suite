@@ -29,6 +29,7 @@ import type {
   EquipmentInput,
   EquipmentLog,
   EquipmentLogInput,
+  EquipmentScanLocation,
   EquipmentUpdate,
   ErrorResponse,
   HealthStatus,
@@ -445,6 +446,83 @@ export const useCreateEquipment = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreateEquipmentMutationOptions(options));
     }
+
+export const getListEquipmentScanLocationsUrl = () => {
+
+
+
+
+  return `/api/equipment/scan-locations`
+}
+
+/**
+ * @summary Last known scan location for each QR/RFID-only equipment record (no Tile)
+ */
+export const listEquipmentScanLocations = async ( options?: RequestInit): Promise<EquipmentScanLocation[]> => {
+
+  return customFetch<EquipmentScanLocation[]>(getListEquipmentScanLocationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEquipmentScanLocationsQueryKey = () => {
+    return [
+    `/api/equipment/scan-locations`
+    ] as const;
+    }
+
+
+export const getListEquipmentScanLocationsQueryOptions = <TData = Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEquipmentScanLocationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEquipmentScanLocations>>> = ({ signal }) => listEquipmentScanLocations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEquipmentScanLocationsQueryResult = NonNullable<Awaited<ReturnType<typeof listEquipmentScanLocations>>>
+export type ListEquipmentScanLocationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Last known scan location for each QR/RFID-only equipment record (no Tile)
+ */
+
+export function useListEquipmentScanLocations<TData = Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEquipmentScanLocationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetEquipmentUrl = (id: number,) => {
 

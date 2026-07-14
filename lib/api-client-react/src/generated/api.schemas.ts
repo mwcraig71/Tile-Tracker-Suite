@@ -226,6 +226,25 @@ export interface ComponentLogInput {
   notes?: string;
 }
 
+export interface EquipmentScanLocation {
+  equipmentId: number;
+  label: string;
+  category: string;
+  /** @nullable */
+  serialNumber?: string | null;
+  /** @nullable */
+  customQrCode?: string | null;
+  /** @nullable */
+  rfidTag?: string | null;
+  latitude: number;
+  longitude: number;
+  /** @nullable */
+  accuracy?: number | null;
+  /** @nullable */
+  city?: string | null;
+  scannedAt: string;
+}
+
 export interface QrLookupResult {
   equipment: Equipment;
   tile?: TileDevice | null;

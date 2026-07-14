@@ -1,17 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { useGetTiles, getGetTilesQueryKey } from "@workspace/api-client-react";
+import {
+  useGetTiles, getGetTilesQueryKey,
+  useListEquipmentScanLocations, getListEquipmentScanLocationsQueryKey,
+} from "@workspace/api-client-react";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import type { LatLngBounds, LatLngTuple } from "leaflet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { getTileIcon } from "@/lib/map-icons";
+import { getTileIcon, getScanLocationIcon } from "@/lib/map-icons";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
 import { Link, useSearch, useLocation } from "wouter";
 import {
-  X, MapPin, Clock, Tag, Hash, CalendarCheck, FileText, ExternalLink, Wifi
+  X, MapPin, Clock, Tag, Hash, CalendarCheck, FileText, ExternalLink, Wifi, Nfc, QrCode
 } from "lucide-react";
 
-import type { TileDevice } from "@workspace/api-client-react";
+import type { TileDevice, EquipmentScanLocation } from "@workspace/api-client-react";
+
+type Selected =
+  | { kind: "tile"; tile: TileDevice }
+  | { kind: "scan"; loc: EquipmentScanLocation };
 
 function MapController({ bounds }: { bounds: LatLngBounds | null }) {
   const map = useMap();
@@ -23,15 +30,18 @@ function MapController({ bounds }: { bounds: LatLngBounds | null }) {
   return null;
 }
 
-function FlyToTile({ tile }: { tile: TileDevice | null }) {
+function FlyToSelected({ selected }: { selected: Selected | null }) {
   const map = useMap();
   const flyDoneRef = useRef(false);
   useEffect(() => {
-    if (tile && tile.latitude != null && tile.longitude != null && !flyDoneRef.current) {
+    if (!selected || flyDoneRef.current) return;
+    const lat = selected.kind === "tile" ? selected.tile.latitude : selected.loc.latitude;
+    const lng = selected.kind === "tile" ? selected.tile.longitude : selected.loc.longitude;
+    if (lat != null && lng != null) {
       flyDoneRef.current = true;
-      map.flyTo([tile.latitude, tile.longitude], 14, { duration: 1.2 });
+      map.flyTo([lat, lng], 14, { duration: 1.2 });
     }
-  }, [tile, map]);
+  }, [selected, map]);
   return null;
 }
 
@@ -60,13 +70,17 @@ function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: strin
 
 function MarkerLayer({
   tiles,
+  scanLocations,
   onSelect,
-  selectedUuid,
+  selected,
 }: {
   tiles: TileDevice[];
-  onSelect: (tile: TileDevice) => void;
-  selectedUuid: string | null;
+  scanLocations: EquipmentScanLocation[];
+  onSelect: (sel: Selected) => void;
+  selected: Selected | null;
 }) {
+  const selectedTileUuid = selected?.kind === "tile" ? selected.tile.uuid : null;
+  const selectedScanId = selected?.kind === "scan" ? selected.loc.equipmentId : null;
   return (
     <>
       {tiles.filter(t => t.latitude != null && t.longitude != null).map((tile) => (
@@ -74,8 +88,18 @@ function MarkerLayer({
           key={tile.uuid}
           position={[tile.latitude!, tile.longitude!]}
           icon={getTileIcon(tile)}
-          eventHandlers={{ click: () => onSelect(tile) }}
-          zIndexOffset={tile.uuid === selectedUuid ? 1000 : 0}
+          eventHandlers={{ click: () => onSelect({ kind: "tile", tile }) }}
+          zIndexOffset={tile.uuid === selectedTileUuid ? 1000 : 0}
+        />
+      ))}
+      {/* QR/RFID-only equipment at its last reported scan location */}
+      {scanLocations.map((loc) => (
+        <Marker
+          key={`scan-${loc.equipmentId}`}
+          position={[loc.latitude, loc.longitude]}
+          icon={getScanLocationIcon(loc.equipmentId === selectedScanId)}
+          eventHandlers={{ click: () => onSelect({ kind: "scan", loc }) }}
+          zIndexOffset={loc.equipmentId === selectedScanId ? 1000 : 0}
         />
       ))}
     </>
@@ -91,22 +115,30 @@ export default function MapPage() {
     query: { queryKey: getGetTilesQueryKey() }
   });
 
+  // Last reported scan locations for QR/RFID-only equipment (no Tile)
+  const { data: scanLocations } = useListEquipmentScanLocations({
+    query: { queryKey: getListEquipmentScanLocationsQueryKey() }
+  });
+
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
-  const [selected, setSelected] = useState<TileDevice | null>(null);
+  const [selected, setSelected] = useState<Selected | null>(null);
   const [, navigate] = useLocation();
   const didAutoSelect = useRef(false);
 
-  // Set initial bounds from all tiles (only when no target UUID)
+  // Set initial bounds from all markers (only when no target UUID)
   useEffect(() => {
-    if (tiles && tiles.length > 0 && !targetUuid) {
+    if ((tiles?.length || scanLocations?.length) && !targetUuid) {
       import("leaflet").then((L) => {
-        const points = tiles
-          .filter(t => t.latitude != null && t.longitude != null)
-          .map(t => [t.latitude!, t.longitude!] as LatLngTuple);
+        const points = [
+          ...(tiles ?? [])
+            .filter(t => t.latitude != null && t.longitude != null)
+            .map(t => [t.latitude!, t.longitude!] as LatLngTuple),
+          ...(scanLocations ?? []).map(l => [l.latitude, l.longitude] as LatLngTuple),
+        ];
         if (points.length > 0) setBounds(L.latLngBounds(points));
       });
     }
-  }, [tiles, targetUuid]);
+  }, [tiles, scanLocations, targetUuid]);
 
   // Auto-select the target tile from URL param
   useEffect(() => {
@@ -114,7 +146,7 @@ export default function MapPage() {
       const tile = tiles.find(t => t.uuid === targetUuid);
       if (tile) {
         didAutoSelect.current = true;
-        setSelected(tile);
+        setSelected({ kind: "tile", tile });
       }
     }
   }, [targetUuid, tiles]);
@@ -128,8 +160,10 @@ export default function MapPage() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const eq = selected?.equipment ?? null;
-  const displayName = eq?.label || selected?.name || "—";
+  const tileSel = selected?.kind === "tile" ? selected.tile : null;
+  const scanSel = selected?.kind === "scan" ? selected.loc : null;
+  const eq = tileSel?.equipment ?? null;
+  const displayName = scanSel?.label || eq?.label || tileSel?.name || "—";
 
   if (isLoading) {
     return <div className="h-full w-full p-4"><Skeleton className="h-full w-full bg-card rounded-none" /></div>;
@@ -153,6 +187,9 @@ export default function MapPage() {
           <div className="flex items-center gap-2 font-mono text-xs text-foreground">
             <div className="w-2.5 h-2.5 md:w-3 md:h-3 bg-gray-500 border border-gray-700 rounded-full flex-shrink-0" /> Dead
           </div>
+          <div className="flex items-center gap-2 font-mono text-xs text-foreground">
+            <div className="w-2.5 h-2.5 md:w-3 md:h-3 bg-amber-400 border border-amber-700 rounded-sm flex-shrink-0" /> QR/RFID (last scan)
+          </div>
         </div>
       </div>
 
@@ -168,11 +205,12 @@ export default function MapPage() {
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
         {!targetUuid && <MapController bounds={bounds} />}
-        <FlyToTile tile={selected} />
+        <FlyToSelected selected={selected} />
         <MarkerLayer
           tiles={tiles ?? []}
+          scanLocations={scanLocations ?? []}
           onSelect={setSelected}
-          selectedUuid={selected?.uuid ?? null}
+          selected={selected}
         />
       </MapContainer>
 
@@ -199,13 +237,18 @@ export default function MapPage() {
                   {displayName}
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <TileStatusBadge tile={selected} />
-                  {eq?.category && (
-                    <span className={`font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 border ${getCategoryStyle(eq.category)}`}>
-                      {eq.category}
+                  {tileSel && <TileStatusBadge tile={tileSel} />}
+                  {scanSel && (
+                    <span className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 border border-amber-500/40 bg-amber-500/10 text-amber-300">
+                      QR/RFID · Last Scan
                     </span>
                   )}
-                  {!eq && (
+                  {(scanSel?.category || eq?.category) && (
+                    <span className={`font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 border ${getCategoryStyle(scanSel?.category || eq!.category)}`}>
+                      {scanSel?.category || eq?.category}
+                    </span>
+                  )}
+                  {tileSel && !eq && (
                     <span className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 border border-border text-muted-foreground">
                       Unlinked
                     </span>
@@ -223,78 +266,143 @@ export default function MapPage() {
 
             {/* Detail rows */}
             <div className="flex-1 overflow-y-auto px-4 py-2">
-              {eq?.serialNumber && (
-                <DetailRow
-                  icon={<Hash className="h-3.5 w-3.5" />}
-                  label="Serial #"
-                  value={eq.serialNumber}
-                />
+              {tileSel && (
+                <>
+                  {eq?.serialNumber && (
+                    <DetailRow
+                      icon={<Hash className="h-3.5 w-3.5" />}
+                      label="Serial #"
+                      value={eq.serialNumber}
+                    />
+                  )}
+
+                  <DetailRow
+                    icon={<Wifi className="h-3.5 w-3.5" />}
+                    label="Tile Name"
+                    value={tileSel.name}
+                  />
+
+                  <DetailRow
+                    icon={<Clock className="h-3.5 w-3.5" />}
+                    label="Last Seen"
+                    value={tileSel.lastSeen
+                      ? new Date(tileSel.lastSeen).toLocaleString()
+                      : "Unknown"
+                    }
+                  />
+
+                  <DetailRow
+                    icon={<MapPin className="h-3.5 w-3.5" />}
+                    label="Coordinates"
+                    value={`${tileSel.latitude?.toFixed(5)}, ${tileSel.longitude?.toFixed(5)}`}
+                  />
+
+                  {eq?.inServiceDate && (
+                    <DetailRow
+                      icon={<CalendarCheck className="h-3.5 w-3.5" />}
+                      label="In Service"
+                      value={new Date(eq.inServiceDate).toLocaleDateString()}
+                    />
+                  )}
+
+                  {eq?.outOfServiceDate && (
+                    <DetailRow
+                      icon={<CalendarCheck className="h-3.5 w-3.5" />}
+                      label="Out of Service"
+                      value={new Date(eq.outOfServiceDate).toLocaleDateString()}
+                    />
+                  )}
+
+                  {eq?.customQrCode && (
+                    <DetailRow
+                      icon={<Tag className="h-3.5 w-3.5" />}
+                      label="Asset Tag"
+                      value={eq.customQrCode}
+                    />
+                  )}
+
+                  {eq?.rfidTag && (
+                    <DetailRow
+                      icon={<Nfc className="h-3.5 w-3.5" />}
+                      label="RFID Tag"
+                      value={eq.rfidTag}
+                    />
+                  )}
+
+                  {eq?.notes && (
+                    <DetailRow
+                      icon={<FileText className="h-3.5 w-3.5" />}
+                      label="Notes"
+                      value={<span className="text-muted-foreground">{eq.notes}</span>}
+                    />
+                  )}
+
+                  {!eq && (
+                    <div className="py-4 text-center font-mono text-xs text-muted-foreground border border-dashed border-border mt-2">
+                      No equipment linked to this tracker.
+                    </div>
+                  )}
+                </>
               )}
 
-              <DetailRow
-                icon={<Wifi className="h-3.5 w-3.5" />}
-                label="Tile Name"
-                value={selected.name}
-              />
+              {scanSel && (
+                <>
+                  {scanSel.serialNumber && (
+                    <DetailRow
+                      icon={<Hash className="h-3.5 w-3.5" />}
+                      label="Serial #"
+                      value={scanSel.serialNumber}
+                    />
+                  )}
 
-              <DetailRow
-                icon={<Clock className="h-3.5 w-3.5" />}
-                label="Last Seen"
-                value={selected.lastSeen
-                  ? new Date(selected.lastSeen).toLocaleString()
-                  : "Unknown"
-                }
-              />
+                  <DetailRow
+                    icon={<Clock className="h-3.5 w-3.5" />}
+                    label="Last Scanned"
+                    value={new Date(scanSel.scannedAt).toLocaleString()}
+                  />
 
-              <DetailRow
-                icon={<MapPin className="h-3.5 w-3.5" />}
-                label="Coordinates"
-                value={`${selected.latitude?.toFixed(5)}, ${selected.longitude?.toFixed(5)}`}
-              />
+                  {scanSel.city && (
+                    <DetailRow
+                      icon={<MapPin className="h-3.5 w-3.5" />}
+                      label="Reported Near"
+                      value={scanSel.city}
+                    />
+                  )}
 
-              {eq?.inServiceDate && (
-                <DetailRow
-                  icon={<CalendarCheck className="h-3.5 w-3.5" />}
-                  label="In Service"
-                  value={new Date(eq.inServiceDate).toLocaleDateString()}
-                />
-              )}
+                  <DetailRow
+                    icon={<MapPin className="h-3.5 w-3.5" />}
+                    label="Coordinates"
+                    value={`${scanSel.latitude.toFixed(5)}, ${scanSel.longitude.toFixed(5)}`}
+                  />
 
-              {eq?.outOfServiceDate && (
-                <DetailRow
-                  icon={<CalendarCheck className="h-3.5 w-3.5" />}
-                  label="Out of Service"
-                  value={new Date(eq.outOfServiceDate).toLocaleDateString()}
-                />
-              )}
+                  {scanSel.customQrCode && (
+                    <DetailRow
+                      icon={<QrCode className="h-3.5 w-3.5" />}
+                      label="Asset Tag"
+                      value={scanSel.customQrCode}
+                    />
+                  )}
 
-              {eq?.customQrCode && (
-                <DetailRow
-                  icon={<Tag className="h-3.5 w-3.5" />}
-                  label="Asset Tag"
-                  value={eq.customQrCode}
-                />
-              )}
+                  {scanSel.rfidTag && (
+                    <DetailRow
+                      icon={<Nfc className="h-3.5 w-3.5" />}
+                      label="RFID Tag"
+                      value={scanSel.rfidTag}
+                    />
+                  )}
 
-              {eq?.notes && (
-                <DetailRow
-                  icon={<FileText className="h-3.5 w-3.5" />}
-                  label="Notes"
-                  value={<span className="text-muted-foreground">{eq.notes}</span>}
-                />
-              )}
-
-              {!eq && (
-                <div className="py-4 text-center font-mono text-xs text-muted-foreground border border-dashed border-border mt-2">
-                  No equipment linked to this tracker.
-                </div>
+                  <div className="py-3 mt-2 font-mono text-[11px] text-muted-foreground border border-dashed border-amber-500/30 bg-amber-500/5 px-3 leading-relaxed">
+                    Position is the last reported QR/RFID scan — this asset has no
+                    live Tile tracker.
+                  </div>
+                </>
               )}
             </div>
 
             {/* Footer action */}
             <div className="flex-shrink-0 p-4 border-t border-border bg-muted/10">
-              {eq ? (
-                <Link href={`/equipment/${eq.id}`}>
+              {(eq || scanSel) ? (
+                <Link href={`/equipment/${scanSel ? scanSel.equipmentId : eq!.id}`}>
                   <Button
                     className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
                     onClick={() => setSelected(null)}
@@ -307,7 +415,7 @@ export default function MapPage() {
                 <Button
                   variant="outline"
                   className="w-full font-mono uppercase tracking-wider rounded-none gap-2"
-                  onClick={() => navigate(`/equipment?linkTile=${selected.uuid}`)}
+                  onClick={() => navigate(`/equipment?linkTile=${tileSel!.uuid}`)}
                 >
                   Link Equipment
                 </Button>

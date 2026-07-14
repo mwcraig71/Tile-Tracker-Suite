@@ -16,6 +16,7 @@ export * from './equipmentComponent';
 export * from './equipmentInput';
 export * from './equipmentLog';
 export * from './equipmentLogInput';
+export * from './equipmentScanLocation';
 export * from './equipmentUpdate';
 export * from './errorResponse';
 export * from './healthStatus';

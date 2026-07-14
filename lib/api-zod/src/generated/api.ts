@@ -127,6 +127,25 @@ export const CreateEquipmentResponse = zod.object({
 
 
 /**
+ * @summary Last known scan location for each QR/RFID-only equipment record (no Tile)
+ */
+export const ListEquipmentScanLocationsResponseItem = zod.object({
+  "equipmentId": zod.number(),
+  "label": zod.string(),
+  "category": zod.string(),
+  "serialNumber": zod.string().nullish(),
+  "customQrCode": zod.string().nullish(),
+  "rfidTag": zod.string().nullish(),
+  "latitude": zod.number(),
+  "longitude": zod.number(),
+  "accuracy": zod.number().nullish(),
+  "city": zod.string().nullish(),
+  "scannedAt": zod.string()
+})
+export const ListEquipmentScanLocationsResponse = zod.array(ListEquipmentScanLocationsResponseItem)
+
+
+/**
  * @summary Get a single equipment record
  */
 export const GetEquipmentParams = zod.object({

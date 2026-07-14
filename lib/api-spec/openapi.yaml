@@ -113,6 +113,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/Equipment"
 
+  /equipment/scan-locations:
+    get:
+      operationId: listEquipmentScanLocations
+      tags: [scan]
+      summary: Last known scan location for each QR/RFID-only equipment record (no Tile)
+      responses:
+        "200":
+          description: Latest scan location per equipment without a Tile
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EquipmentScanLocation"
+
   /equipment/{id}:
     get:
       operationId: getEquipment
@@ -908,6 +923,33 @@ components:
         notes:
           type: string
       required: [logType, logDate]
+
+    EquipmentScanLocation:
+      type: object
+      properties:
+        equipmentId:
+          type: integer
+        label:
+          type: string
+        category:
+          type: string
+        serialNumber:
+          type: ["string", "null"]
+        customQrCode:
+          type: ["string", "null"]
+        rfidTag:
+          type: ["string", "null"]
+        latitude:
+          type: number
+        longitude:
+          type: number
+        accuracy:
+          type: ["number", "null"]
+        city:
+          type: ["string", "null"]
+        scannedAt:
+          type: string
+      required: [equipmentId, label, category, latitude, longitude, scannedAt]
 
     QrLookupResult:
       type: object

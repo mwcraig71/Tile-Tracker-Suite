@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, MapPin, HardDrive, Clock, Tag, FileText, ArrowLeft, QrCode, Download, ScanLine, CalendarCheck, CalendarX, Trash2, ClipboardList, Map, Printer } from "lucide-react";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
 import { EquipmentFormDialog } from "@/components/EquipmentFormDialog";
+import { NfcWriteButton } from "@/components/NfcScanButton";
 import { AddLogDialog } from "@/components/AddLogDialog";
 import { ComponentsSection } from "@/components/ComponentsSection";
 import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
@@ -82,6 +83,9 @@ function QrCodeCard({ equipment }: { equipment: { id: number; label: string; qrT
             className="w-full font-mono text-xs uppercase tracking-wider rounded-none gap-2 border-primary/30 hover:text-primary">
             <Download className="h-3.5 w-3.5" /> Download PNG
           </Button>
+          {/* Write the same scan URL onto an NFC tag (Android Chrome).
+              A written tag opens this page when tapped by any phone. */}
+          <NfcWriteButton url={scanUrl} />
         </div>
         {equipment.customQrCode && (
           <div className="w-full border border-primary/20 bg-primary/5 p-3 space-y-1">

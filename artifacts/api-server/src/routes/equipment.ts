@@ -2,10 +2,11 @@ import { Router } from "express";
 import {
   db,
   equipmentTable,
+  qrScansTable,
   insertEquipmentSchema,
   updateEquipmentSchema,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, desc, isNull } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 export const equipmentRouter = Router();
@@ -110,6 +111,45 @@ equipmentRouter.post("/", async (req, res) => {
     }
     logger.error({ err }, "Failed to create equipment");
     res.status(500).json({ error: "Failed to create equipment" });
+  }
+});
+
+// Last known scan location for each piece of equipment that has no Tile.
+// Lets the map show QR/RFID-only assets alongside live Tile positions.
+// NOTE: registered before /:id so "scan-locations" isn't parsed as an id.
+equipmentRouter.get("/scan-locations", async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        equipmentId: equipmentTable.id,
+        label: equipmentTable.label,
+        category: equipmentTable.category,
+        serialNumber: equipmentTable.serialNumber,
+        customQrCode: equipmentTable.customQrCode,
+        rfidTag: equipmentTable.rfidTag,
+        latitude: qrScansTable.latitude,
+        longitude: qrScansTable.longitude,
+        accuracy: qrScansTable.accuracy,
+        city: qrScansTable.city,
+        scannedAt: qrScansTable.scannedAt,
+      })
+      .from(qrScansTable)
+      .innerJoin(equipmentTable, eq(qrScansTable.equipmentId, equipmentTable.id))
+      .where(isNull(equipmentTable.tileUuid))
+      .orderBy(desc(qrScansTable.scannedAt));
+
+    // Keep only the most recent scan per equipment (rows are newest-first).
+    const seen = new Set<number>();
+    const latest = rows.filter((r) => {
+      if (seen.has(r.equipmentId)) return false;
+      seen.add(r.equipmentId);
+      return true;
+    });
+
+    res.json(latest);
+  } catch (err) {
+    logger.error({ err }, "Failed to list equipment scan locations");
+    res.status(500).json({ error: "Failed to list equipment scan locations" });
   }
 });
 

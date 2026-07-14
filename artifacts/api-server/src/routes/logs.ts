@@ -45,13 +45,18 @@ equipmentLogsRouter.post("/", async (req, res) => {
       res.status(400).json({ error: "logType and logDate are required" });
       return;
     }
+    const parsedLogDate = new Date(logDate);
+    if (isNaN(parsedLogDate.getTime())) {
+      res.status(400).json({ error: "logDate is not a valid date" });
+      return;
+    }
 
     const [log] = await db
       .insert(equipmentLogsTable)
       .values({
         equipmentId: id,
         logType,
-        logDate: new Date(logDate),
+        logDate: parsedLogDate,
         durationMinutes: durationMinutes ?? null,
         operatorName: operatorName ?? null,
         location: location ?? null,
