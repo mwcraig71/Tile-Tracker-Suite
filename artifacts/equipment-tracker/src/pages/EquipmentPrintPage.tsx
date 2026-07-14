@@ -222,7 +222,7 @@ export default function EquipmentPrintPage() {
                 ["Serial Number", equipment.serialNumber || "—"],
                 ["In Service Date", fmtDate(equipment.inServiceDate)],
                 ["Out of Service Date", fmtDate(equipment.outOfServiceDate)],
-                ["Tile Tracker", tile?.name || equipment.tileUuid],
+                ["Tile Tracker", tile?.name || equipment.tileUuid || "None"],
                 ["Last GPS Ping", tile?.lastSeen ? fmtDate(tile.lastSeen) : "—"],
                 ["Last Known Location",
                   tile?.latitude && tile?.longitude
@@ -230,6 +230,7 @@ export default function EquipmentPrintPage() {
                     : "—"
                 ],
                 ["Asset Tag / Custom QR", equipment.customQrCode || "—"],
+                ["RFID / NFC Tag", equipment.rfidTag || "—"],
               ].map(([label, value]) => (
                 <tr key={label} className="border-b border-border/40 print:border-gray-200">
                   <td className="py-1.5 pr-4 text-muted-foreground print:text-gray-500 w-48 align-top">{label}</td>
@@ -369,7 +370,7 @@ export default function EquipmentPrintPage() {
         {/* Footer */}
         <div className="pt-4 border-t border-border print:border-gray-300 flex justify-between text-xs text-muted-foreground print:text-gray-400">
           <span>FieldTrack — Equipment Service Record</span>
-          <span>{equipment.label} · {equipment.serialNumber || equipment.tileUuid}</span>
+          <span>{equipment.label} · {equipment.serialNumber || equipment.tileUuid || `FT-${equipment.id}`}</span>
         </div>
       </div>
 

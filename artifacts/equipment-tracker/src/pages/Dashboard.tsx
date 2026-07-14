@@ -140,10 +140,10 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <Link
-                      href={`/equipment/${tile.equipment?.id || ''}`}
+                      href={tile.equipment ? `/equipment/${tile.equipment.id}` : `/equipment?linkTile=${tile.uuid}`}
                       className="font-mono text-xs text-primary hover:underline uppercase tracking-wider flex-shrink-0"
                     >
-                      Details
+                      {tile.equipment ? "Details" : "Link"}
                     </Link>
                   </div>
                 ))}

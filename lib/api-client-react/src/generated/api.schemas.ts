@@ -15,10 +15,13 @@ export interface ErrorResponse {
 
 export interface Equipment {
   id: number;
-  tileUuid: string;
+  /** @nullable */
+  tileUuid?: string | null;
   qrToken: string;
   /** @nullable */
   customQrCode?: string | null;
+  /** @nullable */
+  rfidTag?: string | null;
   label: string;
   category: string;
   /** @nullable */
@@ -68,8 +71,9 @@ export interface LocationPoint {
 }
 
 export interface EquipmentInput {
-  tileUuid: string;
+  tileUuid?: string;
   customQrCode?: string;
+  rfidTag?: string;
   label: string;
   category: string;
   description?: string;
@@ -80,7 +84,11 @@ export interface EquipmentInput {
 }
 
 export interface EquipmentUpdate {
+  /** @nullable */
+  tileUuid?: string | null;
   customQrCode?: string;
+  /** @nullable */
+  rfidTag?: string | null;
   label?: string;
   category?: string;
   description?: string;
@@ -216,6 +224,25 @@ export interface ComponentLogInput {
   operatorName?: string;
   location?: string;
   notes?: string;
+}
+
+export interface EquipmentScanLocation {
+  equipmentId: number;
+  label: string;
+  category: string;
+  /** @nullable */
+  serialNumber?: string | null;
+  /** @nullable */
+  customQrCode?: string | null;
+  /** @nullable */
+  rfidTag?: string | null;
+  latitude: number;
+  longitude: number;
+  /** @nullable */
+  accuracy?: number | null;
+  /** @nullable */
+  city?: string | null;
+  scannedAt: string;
 }
 
 export interface QrLookupResult {

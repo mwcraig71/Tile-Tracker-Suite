@@ -1,6 +1,6 @@
 # Tile Tracker Suite (FieldTrack)
 
-Equipment tracker that pairs Tile Bluetooth trackers with printable QR labels: live GPS locations and history from the Tile cloud, an equipment registry with components and use logs, and a public QR-scan flow for reporting equipment locations from the field.
+Equipment tracker that pairs Tile Bluetooth trackers, printable QR labels, and RFID/NFC tags: live GPS locations and history from the Tile cloud, an equipment registry with components and use logs, and a public QR-scan flow for reporting equipment locations from the field. Each equipment record can carry any combination of the three identifiers (Tile, QR, RFID) — all linked to the same record.
 
 ## Run & Operate
 
@@ -37,6 +37,7 @@ Equipment tracker that pairs Tile Bluetooth trackers with printable QR labels: l
 - The QR scan endpoints (`/api/scan/:token`) are deliberately public so anyone scanning a printed label can report a location.
 - Writes are validated with the drizzle-zod schemas exported from `@workspace/db` (`insertEquipmentSchema` / `updateEquipmentSchema`), which strip unknown keys — never spread `req.body` into a query.
 - Tile cloud timestamps are inconsistent (seconds vs ms); everything is normalized through `toEpochMs()` in `tile-client.ts`.
+- Equipment identifiers are all optional and unique where present: `tileUuid` (nullable), `qrToken` (always auto-generated), `customQrCode`, and `rfidTag` (nullable, stored uppercase). `/api/qr/lookup` resolves any of them. RFID scanning uses Web NFC (Chrome on Android) with a keyboard-wedge/manual input fallback for handheld UHF readers and iOS.
 - Tile credentials set via Settings live in server memory only and reset on restart.
 
 ## Product

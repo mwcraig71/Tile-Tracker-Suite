@@ -17,6 +17,18 @@ export const getTileIcon = (tile: { lost: boolean; dead: boolean }) => {
   });
 };
 
+// QR/RFID-only equipment plotted at its last reported scan location.
+// Square + amber to distinguish "reported position" from live Tile GPS dots.
+export const getScanLocationIcon = (selected = false) => {
+  return L.divIcon({
+    className: "custom-div-icon bg-transparent border-none",
+    html: `<div class="w-4 h-4 rounded-sm border-2 bg-amber-400 border-amber-700 ${selected ? "shadow-[0_0_12px_rgba(251,191,36,0.8)]" : "shadow-[0_0_8px_rgba(251,191,36,0.4)]"}"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+    popupAnchor: [0, -8],
+  });
+};
+
 export const getHistoryPointIcon = () => {
   return L.divIcon({
     className: "custom-div-icon bg-transparent border-none",

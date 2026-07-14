@@ -29,6 +29,7 @@ import type {
   EquipmentInput,
   EquipmentLog,
   EquipmentLogInput,
+  EquipmentScanLocation,
   EquipmentUpdate,
   ErrorResponse,
   HealthStatus,
@@ -385,7 +386,7 @@ export const getCreateEquipmentUrl = () => {
 }
 
 /**
- * @summary Create or update equipment for a Tile
+ * @summary Create equipment (Tile optional; posting an existing tileUuid updates that record)
  */
 export const createEquipment = async (equipmentInput: EquipmentInput, options?: RequestInit): Promise<Equipment> => {
 
@@ -433,7 +434,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateEquipmentMutationError = ErrorType<unknown>
 
     /**
- * @summary Create or update equipment for a Tile
+ * @summary Create equipment (Tile optional; posting an existing tileUuid updates that record)
  */
 export const useCreateEquipment = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEquipment>>, TError,{data: BodyType<EquipmentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -445,6 +446,83 @@ export const useCreateEquipment = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreateEquipmentMutationOptions(options));
     }
+
+export const getListEquipmentScanLocationsUrl = () => {
+
+
+
+
+  return `/api/equipment/scan-locations`
+}
+
+/**
+ * @summary Last known scan location for each QR/RFID-only equipment record (no Tile)
+ */
+export const listEquipmentScanLocations = async ( options?: RequestInit): Promise<EquipmentScanLocation[]> => {
+
+  return customFetch<EquipmentScanLocation[]>(getListEquipmentScanLocationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEquipmentScanLocationsQueryKey = () => {
+    return [
+    `/api/equipment/scan-locations`
+    ] as const;
+    }
+
+
+export const getListEquipmentScanLocationsQueryOptions = <TData = Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEquipmentScanLocationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEquipmentScanLocations>>> = ({ signal }) => listEquipmentScanLocations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEquipmentScanLocationsQueryResult = NonNullable<Awaited<ReturnType<typeof listEquipmentScanLocations>>>
+export type ListEquipmentScanLocationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Last known scan location for each QR/RFID-only equipment record (no Tile)
+ */
+
+export function useListEquipmentScanLocations<TData = Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEquipmentScanLocations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEquipmentScanLocationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetEquipmentUrl = (id: number,) => {
 
@@ -1724,7 +1802,7 @@ export const getQrLookupUrl = (params: QrLookupParams,) => {
 }
 
 /**
- * @summary Look up equipment by any QR code value
+ * @summary Look up equipment by any tag value (QR token, custom QR/barcode, or RFID tag UID)
  */
 export const qrLookup = async (params: QrLookupParams, options?: RequestInit): Promise<QrLookupResult> => {
 
@@ -1771,7 +1849,7 @@ export type QrLookupQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary Look up equipment by any QR code value
+ * @summary Look up equipment by any tag value (QR token, custom QR/barcode, or RFID tag UID)
  */
 
 export function useQrLookup<TData = Awaited<ReturnType<typeof qrLookup>>, TError = ErrorType<ErrorResponse>>(

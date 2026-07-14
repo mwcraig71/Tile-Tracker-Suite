@@ -7,8 +7,9 @@
  */
 
 export interface EquipmentInput {
-  tileUuid: string;
+  tileUuid?: string;
   customQrCode?: string;
+  rfidTag?: string;
   label: string;
   category: string;
   description?: string;

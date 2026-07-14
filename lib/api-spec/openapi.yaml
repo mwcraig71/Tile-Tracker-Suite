@@ -98,7 +98,7 @@ paths:
     post:
       operationId: createEquipment
       tags: [equipment]
-      summary: Create or update equipment for a Tile
+      summary: Create equipment (Tile optional; posting an existing tileUuid updates that record)
       requestBody:
         required: true
         content:
@@ -112,6 +112,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Equipment"
+
+  /equipment/scan-locations:
+    get:
+      operationId: listEquipmentScanLocations
+      tags: [scan]
+      summary: Last known scan location for each QR/RFID-only equipment record (no Tile)
+      responses:
+        "200":
+          description: Latest scan location per equipment without a Tile
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EquipmentScanLocation"
 
   /equipment/{id}:
     get:
@@ -531,7 +546,7 @@ paths:
     get:
       operationId: qrLookup
       tags: [scan]
-      summary: Look up equipment by any QR code value
+      summary: Look up equipment by any tag value (QR token, custom QR/barcode, or RFID tag UID)
       parameters:
         - name: code
           in: query
@@ -623,10 +638,12 @@ components:
         id:
           type: integer
         tileUuid:
-          type: string
+          type: ["string", "null"]
         qrToken:
           type: string
         customQrCode:
+          type: ["string", "null"]
+        rfidTag:
           type: ["string", "null"]
         label:
           type: string
@@ -646,7 +663,7 @@ components:
           type: string
         updatedAt:
           type: string
-      required: [id, tileUuid, qrToken, label, category, createdAt, updatedAt]
+      required: [id, qrToken, label, category, createdAt, updatedAt]
 
     EquipmentInput:
       type: object
@@ -654,6 +671,8 @@ components:
         tileUuid:
           type: string
         customQrCode:
+          type: string
+        rfidTag:
           type: string
         label:
           type: string
@@ -669,13 +688,17 @@ components:
           type: string
         outOfServiceDate:
           type: string
-      required: [tileUuid, label, category]
+      required: [label, category]
 
     EquipmentUpdate:
       type: object
       properties:
+        tileUuid:
+          type: ["string", "null"]
         customQrCode:
           type: string
+        rfidTag:
+          type: ["string", "null"]
         label:
           type: string
         category:
@@ -900,6 +923,33 @@ components:
         notes:
           type: string
       required: [logType, logDate]
+
+    EquipmentScanLocation:
+      type: object
+      properties:
+        equipmentId:
+          type: integer
+        label:
+          type: string
+        category:
+          type: string
+        serialNumber:
+          type: ["string", "null"]
+        customQrCode:
+          type: ["string", "null"]
+        rfidTag:
+          type: ["string", "null"]
+        latitude:
+          type: number
+        longitude:
+          type: number
+        accuracy:
+          type: ["number", "null"]
+        city:
+          type: ["string", "null"]
+        scannedAt:
+          type: string
+      required: [equipmentId, label, category, latitude, longitude, scannedAt]
 
     QrLookupResult:
       type: object

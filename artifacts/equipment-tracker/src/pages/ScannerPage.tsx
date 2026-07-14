@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import jsQR from "jsqr";
-import { useQrLookup, getQrLookupQueryKey } from "@workspace/api-client-react";
-import { Loader2, QrCode, MapPin, Tag, Clock, FileText, ScanLine, ChevronRight, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { useQrLookup, getQrLookupQueryKey, useRecordScan } from "@workspace/api-client-react";
+import { Loader2, QrCode, MapPin, Tag, Clock, FileText, ScanLine, ChevronRight, AlertTriangle, CheckCircle2, XCircle, Nfc, Keyboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
+import { NfcScanButton } from "@/components/NfcScanButton";
 
 type ScannerStatus = "idle" | "starting" | "scanning" | "looking_up" | "found" | "not_found" | "camera_error";
 
@@ -28,6 +30,11 @@ export default function ScannerPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [lookupCode, setLookupCode] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(false);
+  const [manualCode, setManualCode] = useState("");
+  const [locState, setLocState] = useState<"idle" | "requesting" | "saved" | "error">("idle");
+  const [locMsg, setLocMsg] = useState("");
+
+  const recordScan = useRecordScan();
 
   const { data: lookupResult, isLoading: lookupLoading, isError: lookupError, refetch } = useQrLookup(
     { code: lookupCode || "" },
@@ -100,6 +107,49 @@ export default function ScannerPage() {
   function resetScanner() {
     setStatus("idle");
     setLookupCode(null);
+    setManualCode("");
+    setLocState("idle");
+    setLocMsg("");
+  }
+
+  /**
+   * Record the phone's current GPS position against this equipment, using
+   * the same public scan endpoint the printed QR labels hit. This makes an
+   * RFID/NFC lookup update location history just like a QR scan does.
+   */
+  function recordLocationHere(qrToken: string) {
+    if (!navigator.geolocation) {
+      setLocState("error");
+      setLocMsg("GPS not available on this device.");
+      return;
+    }
+    setLocState("requesting");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const scan = await recordScan.mutateAsync({
+            token: qrToken,
+            data: {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy,
+            },
+          });
+          setLocState("saved");
+          setLocMsg(scan.city ? `Location saved — ${scan.city}` : "Location saved");
+        } catch {
+          setLocState("error");
+          setLocMsg("Failed to save location. Try again.");
+        }
+      },
+      (err) => {
+        setLocState("error");
+        setLocMsg(err.code === err.PERMISSION_DENIED
+          ? "Location permission denied."
+          : "Could not get GPS position.");
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
   }
 
   useEffect(() => () => stopCamera(), []);
@@ -119,10 +169,10 @@ export default function ScannerPage() {
     <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto w-full">
       <header className="border-b border-border pb-4">
         <h1 className="font-mono font-bold text-2xl text-foreground uppercase tracking-wider flex items-center gap-3">
-          <ScanLine className="h-6 w-6 text-primary" /> QR Scanner
+          <ScanLine className="h-6 w-6 text-primary" /> Tag Scanner
         </h1>
         <p className="font-mono text-xs text-muted-foreground mt-1">
-          Scan any FieldTrack QR code or custom asset tag to look up equipment.
+          Scan any FieldTrack QR code, custom asset tag, or RFID/NFC tag to look up equipment.
         </p>
       </header>
 
@@ -197,6 +247,51 @@ export default function ScannerPage() {
         )}
       </div>
 
+      {/* RFID / NFC + manual entry — works alongside the camera scanner */}
+      {status !== "found" && status !== "looking_up" && (
+        <Card className="border-border bg-card rounded-none">
+          <CardHeader className="border-b border-border bg-muted/30 py-3 px-4">
+            <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Nfc className="h-4 w-4 text-primary" /> RFID / NFC & Manual Lookup
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <NfcScanButton onDetected={doLookup} />
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const code = manualCode.trim();
+                if (code) doLookup(code);
+              }}
+            >
+              <div className="relative flex-1">
+                <Keyboard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value)}
+                  placeholder="Type tag ID, or scan with a handheld RFID reader…"
+                  className="pl-9 font-mono text-sm bg-background rounded-none border-border"
+                  data-testid="input-manual-tag"
+                />
+              </div>
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={!manualCode.trim()}
+                className="font-mono text-xs uppercase tracking-wider rounded-none border-primary/30 hover:text-primary"
+              >
+                Look Up
+              </Button>
+            </form>
+            <p className="font-mono text-xs text-muted-foreground leading-relaxed">
+              Bluetooth handheld RFID readers in keyboard mode can scan straight
+              into the field above — tap the field first, then pull the trigger.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Equipment result card */}
       {status === "found" && eq && (
         <Card className="border-primary/30 bg-card rounded-none animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -213,6 +308,8 @@ export default function ScannerPage() {
               {[
                 { label: "Category", value: eq.category, highlight: true },
                 { label: "Serial #", value: eq.serialNumber || "N/A" },
+                ...(eq.customQrCode ? [{ label: "Asset Tag", value: eq.customQrCode }] : []),
+                ...(eq.rfidTag ? [{ label: "RFID Tag", value: eq.rfidTag }] : []),
                 { label: "In Service", value: eq.inServiceDate ? new Date(eq.inServiceDate).toLocaleDateString() : "Not set" },
                 { label: "Out of Service", value: eq.outOfServiceDate ? new Date(eq.outOfServiceDate).toLocaleDateString() : "Active" },
               ].map(row => (
@@ -273,6 +370,31 @@ export default function ScannerPage() {
                 </div>
               </div>
             )}
+
+            {/* Record this phone's GPS as the equipment's location */}
+            <div className="border-t border-border pt-3 space-y-2">
+              {locState === "saved" ? (
+                <div className="flex items-center gap-2 font-mono text-xs text-green-400">
+                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> {locMsg}
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={locState === "requesting"}
+                  onClick={() => recordLocationHere(eq.qrToken)}
+                  className="w-full font-mono text-xs uppercase tracking-wider rounded-none gap-2 border-primary/30 hover:text-primary"
+                  data-testid="button-record-location"
+                >
+                  {locState === "requesting"
+                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Getting GPS…</>
+                    : <><MapPin className="h-3.5 w-3.5" /> Update Location Here</>}
+                </Button>
+              )}
+              {locState === "error" && (
+                <p className="font-mono text-xs text-destructive">{locMsg}</p>
+              )}
+            </div>
 
             <div className="flex items-center justify-between border-t border-border pt-3 gap-3">
               <Button variant="ghost" size="sm" onClick={resetScanner} className="font-mono text-xs rounded-none uppercase text-muted-foreground">
