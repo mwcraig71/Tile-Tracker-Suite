@@ -28,7 +28,9 @@ qrLookupRouter.get("/", async (req, res) => {
     const extractedToken = extractTokenFromUrl(code);
     const lookupToken = extractedToken ?? code;
 
-    // Find by qrToken (FieldTrack auto-generated) OR customQrCode (user-defined)
+    // Find by qrToken (FieldTrack auto-generated), customQrCode
+    // (user-defined QR/barcode), or rfidTag (NFC/RFID tag UID).
+    // RFID UIDs are stored uppercase, so match case-insensitively.
     const results = await db
       .select()
       .from(equipmentTable)
@@ -36,12 +38,13 @@ qrLookupRouter.get("/", async (req, res) => {
         or(
           eq(equipmentTable.qrToken, lookupToken),
           eq(equipmentTable.customQrCode, code),
+          eq(equipmentTable.rfidTag, code.toUpperCase()),
         )
       )
       .limit(1);
 
     if (results.length === 0) {
-      res.status(404).json({ error: "No equipment linked to this QR code" });
+      res.status(404).json({ error: "No equipment linked to this code or tag" });
       return;
     }
 
@@ -63,13 +66,16 @@ qrLookupRouter.get("/", async (req, res) => {
       .orderBy(desc(equipmentLogsTable.logDate))
       .limit(5);
 
-    // Try to get live tile info
+    // Try to get live tile info — only when this equipment has a Tile linked,
+    // so QR/RFID-only lookups don't pay for a Tile cloud round-trip.
     let tile = null;
-    try {
-      const tiles = await getTiles();
-      tile = tiles.find(t => t.uuid === equipment.tileUuid) ?? null;
-    } catch {
-      // Tile data is optional
+    if (equipment.tileUuid) {
+      try {
+        const tiles = await getTiles();
+        tile = tiles.find(t => t.uuid === equipment.tileUuid) ?? null;
+      } catch {
+        // Tile data is optional
+      }
     }
 
     res.json({

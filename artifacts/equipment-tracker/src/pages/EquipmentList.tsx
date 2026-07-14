@@ -1,9 +1,13 @@
 import { useState, useMemo, useEffect } from "react";
-import { useGetTiles, getGetTilesQueryKey } from "@workspace/api-client-react";
+import {
+  useGetTiles, getGetTilesQueryKey,
+  useListEquipment, getListEquipmentQueryKey,
+  type TileDevice, type Equipment,
+} from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, MapPin, HardDrive, Filter, X } from "lucide-react";
+import { Search, MapPin, HardDrive, Filter, X, Plus, QrCode } from "lucide-react";
 import { TileStatusBadge } from "@/components/TileStatusBadge";
 import { EquipmentFormDialog } from "@/components/EquipmentFormDialog";
 import { Link, useSearch, useLocation } from "wouter";
@@ -15,6 +19,25 @@ import { useNearestCities } from "@/hooks/useNearestCities";
 import { EQUIPMENT_CATEGORIES } from "@/lib/categories";
 const CATEGORIES = [...EQUIPMENT_CATEGORIES];
 const ALL = "all";
+
+/**
+ * A row in the registry: either a Tile (optionally linked to equipment)
+ * or a QR/RFID-only equipment record with no Tile.
+ */
+interface AssetRow {
+  key: string;
+  tile: TileDevice | null;
+  equipment: Equipment | null;
+}
+
+function NoTileBadge({ equipment }: { equipment: Equipment }) {
+  return (
+    <Badge variant="outline" className="font-mono text-xs rounded-none border-border text-muted-foreground gap-1">
+      <QrCode className="h-3 w-3" />
+      {equipment.rfidTag ? "QR + RFID" : "QR ONLY"}
+    </Badge>
+  );
+}
 
 export default function EquipmentList() {
   const [nameFilter, setNameFilter] = useState("");
@@ -35,39 +58,59 @@ export default function EquipmentList() {
     }
   }, [search]);
 
-  const { data: tiles, isLoading } = useGetTiles({
+  const { data: tiles, isLoading: tilesLoading } = useGetTiles({
     query: { queryKey: getGetTilesQueryKey() }
   });
 
+  // Equipment with no Tile (QR/RFID-only) never appears in the tiles feed,
+  // so pull the full registry too.
+  const { data: allEquipment, isLoading: equipmentLoading } = useListEquipment({
+    query: { queryKey: getListEquipmentQueryKey() }
+  });
+
+  const isLoading = tilesLoading && equipmentLoading;
+
   const cities = useNearestCities(tiles);
 
-  const filteredTiles = useMemo(() => {
-    if (!tiles) return [];
-    return tiles.filter(tile => {
+  const assets = useMemo<AssetRow[]>(() => {
+    const tileRows: AssetRow[] = (tiles ?? []).map((tile) => ({
+      key: tile.uuid,
+      tile,
+      equipment: tile.equipment ?? null,
+    }));
+    const untrackedRows: AssetRow[] = (allEquipment ?? [])
+      .filter((e) => !e.tileUuid)
+      .map((e) => ({ key: `eq-${e.id}`, tile: null, equipment: e }));
+    return [...tileRows, ...untrackedRows];
+  }, [tiles, allEquipment]);
+
+  const filteredAssets = useMemo(() => {
+    return assets.filter(({ tile, equipment }) => {
       // Name filter
       if (nameFilter) {
         const term = nameFilter.toLowerCase();
         const matchesName =
-          tile.name.toLowerCase().includes(term) ||
-          tile.equipment?.label.toLowerCase().includes(term) ||
-          (tile.equipment?.serialNumber?.toLowerCase().includes(term) ?? false);
+          (tile?.name.toLowerCase().includes(term) ?? false) ||
+          (equipment?.label.toLowerCase().includes(term) ?? false) ||
+          (equipment?.serialNumber?.toLowerCase().includes(term) ?? false);
         if (!matchesName) return false;
       }
 
       // Category filter
       if (categoryFilter !== ALL) {
-        if (!tile.equipment?.category || tile.equipment.category !== categoryFilter) return false;
+        if (!equipment?.category || equipment.category !== categoryFilter) return false;
       }
 
-      // City filter
+      // City filter — only Tiles report a live city
       if (cityFilter) {
+        if (!tile) return false;
         const city = cities.get(tile.uuid) ?? "";
         if (!city.toLowerCase().includes(cityFilter.toLowerCase())) return false;
       }
 
       return true;
     });
-  }, [tiles, nameFilter, categoryFilter, cityFilter, cities]);
+  }, [assets, nameFilter, categoryFilter, cityFilter, cities]);
 
   // Unique cities for the datalist autocomplete
   const uniqueCities = useMemo(() => {
@@ -87,13 +130,23 @@ export default function EquipmentList() {
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-5 w-full">
       <header className="flex flex-col gap-3 border-b border-border pb-3 md:pb-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold font-mono text-primary uppercase tracking-widest flex items-center gap-2">
-            <HardDrive className="h-5 w-5 md:h-6 md:w-6" /> Equipment Registry
-          </h1>
-          <p className="text-xs md:text-sm font-mono text-muted-foreground mt-1">
-            Master list of all tracked physical assets.
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold font-mono text-primary uppercase tracking-widest flex items-center gap-2">
+              <HardDrive className="h-5 w-5 md:h-6 md:w-6" /> Equipment Registry
+            </h1>
+            <p className="text-xs md:text-sm font-mono text-muted-foreground mt-1">
+              Master list of all tracked physical assets.
+            </p>
+          </div>
+          {/* Create equipment without a Tile — QR and/or RFID only */}
+          <EquipmentFormDialog
+            trigger={
+              <Button size="sm" className="font-mono text-xs uppercase tracking-wider rounded-none gap-1.5 flex-shrink-0">
+                <Plus className="h-3.5 w-3.5" /> Add Equipment
+              </Button>
+            }
+          />
         </div>
 
         {/* Filter row */}
@@ -163,7 +216,7 @@ export default function EquipmentList() {
         {/* Result count */}
         {!isLoading && (
           <p className="font-mono text-xs text-muted-foreground">
-            {filteredTiles.length} of {tiles?.length ?? 0} assets
+            {filteredAssets.length} of {assets.length} assets
             {cities.size > 0 && tiles && cities.size < tiles.filter(t => t.latitude).length && (
               <span className="text-primary/60 ml-2">· resolving locations...</span>
             )}
@@ -181,46 +234,46 @@ export default function EquipmentList() {
         <>
           {/* ── Mobile cards ── */}
           <div className="md:hidden space-y-2">
-            {filteredTiles.length === 0 ? (
+            {filteredAssets.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground font-mono text-sm">
                 No assets match the current filters.
               </div>
             ) : (
-              filteredTiles.map((tile) => {
-                const city = cities.get(tile.uuid);
+              filteredAssets.map(({ key, tile, equipment }) => {
+                const city = tile ? cities.get(tile.uuid) : undefined;
                 return (
                   <div
-                    key={tile.uuid}
-                    data-testid={`card-equipment-${tile.uuid}`}
+                    key={key}
+                    data-testid={`card-equipment-${key}`}
                     className="border border-border bg-card p-3 space-y-2"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        {tile.equipment ? (
+                        {equipment ? (
                           <>
                             <div className="font-mono font-semibold text-foreground truncate">
-                              {tile.equipment.label}
+                              {equipment.label}
                             </div>
-                            {tile.equipment.serialNumber && (
+                            {equipment.serialNumber && (
                               <div className="text-xs font-mono text-muted-foreground">
-                                SN: {tile.equipment.serialNumber}
+                                SN: {equipment.serialNumber}
                               </div>
                             )}
                           </>
                         ) : (
                           <>
                             <div className="font-mono text-muted-foreground italic text-sm">Unlinked Tile</div>
-                            <div className="text-xs font-mono text-muted-foreground truncate">{tile.name}</div>
+                            <div className="text-xs font-mono text-muted-foreground truncate">{tile!.name}</div>
                           </>
                         )}
                       </div>
-                      <TileStatusBadge tile={tile} />
+                      {tile ? <TileStatusBadge tile={tile} /> : <NoTileBadge equipment={equipment!} />}
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
-                      {tile.equipment?.category && (
+                      {equipment?.category && (
                         <Badge variant="outline" className="font-mono text-xs rounded-none border-primary/30 text-primary bg-primary/5">
-                          {tile.equipment.category}
+                          {equipment.category}
                         </Badge>
                       )}
                       {city ? (
@@ -228,7 +281,7 @@ export default function EquipmentList() {
                           <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
                           {city}
                         </div>
-                      ) : tile.latitude && tile.longitude ? (
+                      ) : tile?.latitude && tile?.longitude ? (
                         <div className="flex items-center gap-1 font-mono text-xs text-muted-foreground/50">
                           <MapPin className="h-3 w-3 flex-shrink-0" />
                           <span className="animate-pulse">resolving...</span>
@@ -238,10 +291,12 @@ export default function EquipmentList() {
 
                     <div className="flex items-center justify-between border-t border-border/50 pt-2">
                       <div className="font-mono text-xs text-muted-foreground">
-                        {tile.lastSeen ? new Date(tile.lastSeen).toLocaleDateString() : "No signal"}
+                        {tile
+                          ? tile.lastSeen ? new Date(tile.lastSeen).toLocaleDateString() : "No signal"
+                          : "QR/RFID tracked"}
                       </div>
                       <div className="flex items-center gap-1">
-                        {tile.latitude != null && tile.longitude != null && (
+                        {tile && tile.latitude != null && tile.longitude != null && (
                           <Link href={`/map?tile=${tile.uuid}`}>
                             <Button
                               variant="ghost"
@@ -253,12 +308,12 @@ export default function EquipmentList() {
                             </Button>
                           </Link>
                         )}
-                        {tile.equipment ? (
-                          <Link href={`/equipment/${tile.equipment.id}`}>
+                        {equipment ? (
+                          <Link href={`/equipment/${equipment.id}`}>
                             <Button
                               variant="ghost"
                               size="sm"
-                              data-testid={`button-details-${tile.uuid}`}
+                              data-testid={`button-details-${key}`}
                               className="font-mono text-xs uppercase tracking-wider rounded-none hover:text-primary h-7 px-2"
                             >
                               Details
@@ -266,8 +321,8 @@ export default function EquipmentList() {
                           </Link>
                         ) : (
                           <EquipmentFormDialog
-                            tileUuid={tile.uuid}
-                            {...(tile.uuid === autoLinkUuid ? { open: autoLinkOpen, onOpenChange: (v) => setAutoLinkOpen(v) } : {})}
+                            tileUuid={tile!.uuid}
+                            {...(tile!.uuid === autoLinkUuid ? { open: autoLinkOpen, onOpenChange: (v) => setAutoLinkOpen(v) } : {})}
                           />
                         )}
                       </div>
@@ -292,43 +347,43 @@ export default function EquipmentList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTiles.length === 0 ? (
+                {filteredAssets.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-32 text-center font-mono text-sm text-muted-foreground">
                       No assets match the current filters.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredTiles.map((tile) => {
-                    const city = cities.get(tile.uuid);
+                  filteredAssets.map(({ key, tile, equipment }) => {
+                    const city = tile ? cities.get(tile.uuid) : undefined;
                     return (
-                      <TableRow key={tile.uuid} className="border-border hover:bg-muted/20 transition-colors">
+                      <TableRow key={key} className="border-border hover:bg-muted/20 transition-colors">
                         <TableCell className="font-mono font-medium">
-                          {tile.equipment ? (
+                          {equipment ? (
                             <div className="flex flex-col">
-                              <span className="text-foreground">{tile.equipment.label}</span>
-                              {tile.equipment.serialNumber && (
-                                <span className="text-xs text-muted-foreground">SN: {tile.equipment.serialNumber}</span>
+                              <span className="text-foreground">{equipment.label}</span>
+                              {equipment.serialNumber && (
+                                <span className="text-xs text-muted-foreground">SN: {equipment.serialNumber}</span>
                               )}
                             </div>
                           ) : (
                             <div className="flex flex-col">
                               <span className="text-muted-foreground italic">Unlinked Tile</span>
-                              <span className="text-xs text-muted-foreground">{tile.name}</span>
+                              <span className="text-xs text-muted-foreground">{tile!.name}</span>
                             </div>
                           )}
                         </TableCell>
                         <TableCell>
-                          {tile.equipment?.category ? (
+                          {equipment?.category ? (
                             <Badge variant="outline" className="font-mono text-xs rounded-none border-primary/30 text-primary bg-primary/5">
-                              {tile.equipment.category}
+                              {equipment.category}
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground text-xs font-mono">—</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          <TileStatusBadge tile={tile} />
+                          {tile ? <TileStatusBadge tile={tile} /> : <NoTileBadge equipment={equipment!} />}
                         </TableCell>
                         <TableCell>
                           {city ? (
@@ -336,21 +391,23 @@ export default function EquipmentList() {
                               <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
                               {city}
                             </div>
-                          ) : tile.latitude && tile.longitude ? (
+                          ) : tile?.latitude && tile?.longitude ? (
                             <div className="flex items-center gap-1 font-mono text-xs text-muted-foreground/50">
                               <MapPin className="h-3 w-3 flex-shrink-0" />
                               <span className="animate-pulse">resolving...</span>
                             </div>
                           ) : (
-                            <span className="text-muted-foreground text-xs font-mono">No GPS</span>
+                            <span className="text-muted-foreground text-xs font-mono">{tile ? "No GPS" : "—"}</span>
                           )}
                         </TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground">
-                          {tile.lastSeen ? new Date(tile.lastSeen).toLocaleString() : "Never"}
+                          {tile
+                            ? tile.lastSeen ? new Date(tile.lastSeen).toLocaleString() : "Never"
+                            : "—"}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            {tile.latitude != null && tile.longitude != null && (
+                            {tile && tile.latitude != null && tile.longitude != null && (
                               <Link href={`/map?tile=${tile.uuid}`}>
                                 <Button
                                   variant="ghost"
@@ -362,12 +419,12 @@ export default function EquipmentList() {
                                 </Button>
                               </Link>
                             )}
-                            {tile.equipment ? (
-                              <Link href={`/equipment/${tile.equipment.id}`}>
+                            {equipment ? (
+                              <Link href={`/equipment/${equipment.id}`}>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  data-testid={`button-details-desktop-${tile.uuid}`}
+                                  data-testid={`button-details-desktop-${key}`}
                                   className="font-mono text-xs uppercase tracking-wider rounded-none hover:text-primary"
                                 >
                                   Details
@@ -375,8 +432,8 @@ export default function EquipmentList() {
                               </Link>
                             ) : (
                               <EquipmentFormDialog
-                                tileUuid={tile.uuid}
-                                {...(tile.uuid === autoLinkUuid ? { open: autoLinkOpen, onOpenChange: (v) => setAutoLinkOpen(v) } : {})}
+                                tileUuid={tile!.uuid}
+                                {...(tile!.uuid === autoLinkUuid ? { open: autoLinkOpen, onOpenChange: (v) => setAutoLinkOpen(v) } : {})}
                               />
                             )}
                           </div>

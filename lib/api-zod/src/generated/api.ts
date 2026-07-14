@@ -35,9 +35,10 @@ export const GetTilesResponseItem = zod.object({
   "hardwareVersion": zod.string(),
   "equipment": zod.object({
   "id": zod.number(),
-  "tileUuid": zod.string(),
+  "tileUuid": zod.string().nullish(),
   "qrToken": zod.string(),
   "customQrCode": zod.string().nullish(),
+  "rfidTag": zod.string().nullish(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -74,9 +75,10 @@ export const TileHistoryResponse = zod.array(TileHistoryResponseItem)
  */
 export const ListEquipmentResponseItem = zod.object({
   "id": zod.number(),
-  "tileUuid": zod.string(),
+  "tileUuid": zod.string().nullish(),
   "qrToken": zod.string(),
   "customQrCode": zod.string().nullish(),
+  "rfidTag": zod.string().nullish(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -91,11 +93,12 @@ export const ListEquipmentResponse = zod.array(ListEquipmentResponseItem)
 
 
 /**
- * @summary Create or update equipment for a Tile
+ * @summary Create equipment (Tile optional; posting an existing tileUuid updates that record)
  */
 export const CreateEquipmentBody = zod.object({
-  "tileUuid": zod.string(),
+  "tileUuid": zod.string().optional(),
   "customQrCode": zod.string().optional(),
+  "rfidTag": zod.string().optional(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().optional(),
@@ -107,9 +110,10 @@ export const CreateEquipmentBody = zod.object({
 
 export const CreateEquipmentResponse = zod.object({
   "id": zod.number(),
-  "tileUuid": zod.string(),
+  "tileUuid": zod.string().nullish(),
   "qrToken": zod.string(),
   "customQrCode": zod.string().nullish(),
+  "rfidTag": zod.string().nullish(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -131,9 +135,10 @@ export const GetEquipmentParams = zod.object({
 
 export const GetEquipmentResponse = zod.object({
   "id": zod.number(),
-  "tileUuid": zod.string(),
+  "tileUuid": zod.string().nullish(),
   "qrToken": zod.string(),
   "customQrCode": zod.string().nullish(),
+  "rfidTag": zod.string().nullish(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -154,7 +159,9 @@ export const UpdateEquipmentParams = zod.object({
 })
 
 export const UpdateEquipmentBody = zod.object({
+  "tileUuid": zod.string().nullish(),
   "customQrCode": zod.string().optional(),
+  "rfidTag": zod.string().nullish(),
   "label": zod.string().optional(),
   "category": zod.string().optional(),
   "description": zod.string().optional(),
@@ -166,9 +173,10 @@ export const UpdateEquipmentBody = zod.object({
 
 export const UpdateEquipmentResponse = zod.object({
   "id": zod.number(),
-  "tileUuid": zod.string(),
+  "tileUuid": zod.string().nullish(),
   "qrToken": zod.string(),
   "customQrCode": zod.string().nullish(),
+  "rfidTag": zod.string().nullish(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -458,9 +466,10 @@ export const GetDashboardSummaryResponse = zod.object({
   "hardwareVersion": zod.string(),
   "equipment": zod.object({
   "id": zod.number(),
-  "tileUuid": zod.string(),
+  "tileUuid": zod.string().nullish(),
   "qrToken": zod.string(),
   "customQrCode": zod.string().nullish(),
+  "rfidTag": zod.string().nullish(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -531,7 +540,7 @@ export const RecordScanResponse = zod.object({
 
 
 /**
- * @summary Look up equipment by any QR code value
+ * @summary Look up equipment by any tag value (QR token, custom QR/barcode, or RFID tag UID)
  */
 export const QrLookupQueryParams = zod.object({
   "code": zod.coerce.string()
@@ -540,9 +549,10 @@ export const QrLookupQueryParams = zod.object({
 export const QrLookupResponse = zod.object({
   "equipment": zod.object({
   "id": zod.number(),
-  "tileUuid": zod.string(),
+  "tileUuid": zod.string().nullish(),
   "qrToken": zod.string(),
   "customQrCode": zod.string().nullish(),
+  "rfidTag": zod.string().nullish(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),
@@ -569,9 +579,10 @@ export const QrLookupResponse = zod.object({
   "hardwareVersion": zod.string(),
   "equipment": zod.object({
   "id": zod.number(),
-  "tileUuid": zod.string(),
+  "tileUuid": zod.string().nullish(),
   "qrToken": zod.string(),
   "customQrCode": zod.string().nullish(),
+  "rfidTag": zod.string().nullish(),
   "label": zod.string(),
   "category": zod.string(),
   "description": zod.string().nullish(),

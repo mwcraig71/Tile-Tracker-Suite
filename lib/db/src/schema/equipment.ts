@@ -5,9 +5,14 @@ import { randomUUID } from "crypto";
 
 export const equipmentTable = pgTable("equipment", {
   id: serial("id").primaryKey(),
-  tileUuid: text("tile_uuid").notNull().unique(),
+  // Each identifier is optional; equipment can carry any combination of a
+  // Tile tracker, a printable/custom QR code, and an RFID tag — all linked
+  // to the same record. (qrToken is always generated so a printable QR
+  // label is available, but attaching it is optional.)
+  tileUuid: text("tile_uuid").unique(),
   qrToken: text("qr_token").notNull().unique().$defaultFn(() => randomUUID()),
   customQrCode: text("custom_qr_code"),
+  rfidTag: text("rfid_tag").unique(),
   label: text("label").notNull(),
   category: text("category").notNull(),
   description: text("description"),
@@ -73,9 +78,9 @@ export const insertEquipmentSchema = createInsertSchema(equipmentTable).omit({
   id: true, qrToken: true, createdAt: true, updatedAt: true,
 });
 
-export const updateEquipmentSchema = insertEquipmentSchema
-  .omit({ tileUuid: true })
-  .partial();
+// tileUuid stays editable on update so a Tile can be linked to (or unlinked
+// from) existing equipment that was created with only QR/RFID identifiers.
+export const updateEquipmentSchema = insertEquipmentSchema.partial();
 
 export const insertQrScanSchema = createInsertSchema(qrScansTable).omit({
   id: true, scannedAt: true,

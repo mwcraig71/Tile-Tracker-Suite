@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, equipmentTable, qrScansTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 export const scanRouter = Router();
@@ -66,8 +66,9 @@ scanRouter.get("/:token", async (req, res) => {
       .orderBy(desc(qrScansTable.scannedAt))
       .limit(1);
 
-    const allScans = await db
-      .select()
+    // Count in the database rather than fetching every scan row.
+    const [{ value: totalScans }] = await db
+      .select({ value: count() })
       .from(qrScansTable)
       .where(eq(qrScansTable.equipmentId, equipment.id));
 
@@ -81,7 +82,7 @@ scanRouter.get("/:token", async (req, res) => {
       inServiceDate: equipment.inServiceDate ? equipment.inServiceDate.toISOString() : null,
       outOfServiceDate: equipment.outOfServiceDate ? equipment.outOfServiceDate.toISOString() : null,
       lastQrScan: lastScan ?? null,
-      totalScans: allScans.length,
+      totalScans,
     });
   } catch (err) {
     logger.error({ err }, "Failed to get scan info");

@@ -38,7 +38,7 @@ function buildScanUrl(qrToken: string): string {
   return `${base}/scan/${qrToken}`;
 }
 
-function QrCodeCard({ equipment }: { equipment: { id: number; label: string; qrToken: string; customQrCode?: string | null } }) {
+function QrCodeCard({ equipment }: { equipment: { id: number; label: string; qrToken: string; customQrCode?: string | null; rfidTag?: string | null } }) {
   const scanUrl = buildScanUrl(equipment.qrToken);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -87,6 +87,12 @@ function QrCodeCard({ equipment }: { equipment: { id: number; label: string; qrT
           <div className="w-full border border-primary/20 bg-primary/5 p-3 space-y-1">
             <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Custom Tag / Barcode</p>
             <p className="font-mono text-xs text-primary break-all">{equipment.customQrCode}</p>
+          </div>
+        )}
+        {equipment.rfidTag && (
+          <div className="w-full border border-primary/20 bg-primary/5 p-3 space-y-1">
+            <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider">RFID / NFC Tag</p>
+            <p className="font-mono text-xs text-primary break-all">{equipment.rfidTag}</p>
           </div>
         )}
         <p className="font-mono text-xs text-muted-foreground text-center leading-relaxed">
@@ -440,7 +446,7 @@ export default function EquipmentDetail() {
                 { label: "Label", value: equipment.label },
                 { label: "Category", value: equipment.category, highlight: true },
                 { label: "Serial #", value: equipment.serialNumber || "N/A" },
-                { label: "Tile Name", value: tile?.name || "Unknown" },
+                { label: "Tile Name", value: tile?.name || (equipment.tileUuid ? "Unknown" : "No Tile linked") },
               ].map(row => (
                 <div key={row.label} className="flex justify-between gap-2 py-2">
                   <span className="text-muted-foreground text-xs flex-shrink-0">{row.label}</span>
@@ -511,7 +517,7 @@ export default function EquipmentDetail() {
                 </MapContainer>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground font-mono text-sm">
-                  <MapPin className="h-4 w-4 mr-2" /> NO GPS SIGNAL
+                  <MapPin className="h-4 w-4 mr-2" /> {equipment.tileUuid ? "NO GPS SIGNAL" : "NO TILE LINKED — TRACKED VIA QR/RFID SCANS"}
                 </div>
               )}
             </CardContent>

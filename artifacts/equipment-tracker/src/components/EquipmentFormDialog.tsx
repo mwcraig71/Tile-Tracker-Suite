@@ -13,9 +13,10 @@ import { useCreateEquipment, useUpdateEquipment, useDeleteEquipment } from "@wor
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Camera, QrCode, X } from "lucide-react";
+import { Trash2, Camera, QrCode, X, Nfc } from "lucide-react";
 import { EQUIPMENT_CATEGORIES } from "@/lib/categories";
 import { QrScannerCamera } from "@/components/QrScannerCamera";
+import { NfcScanButton } from "@/components/NfcScanButton";
 
 const formSchema = z.object({
   label: z.string().min(1, "Label is required"),
@@ -26,12 +27,14 @@ const formSchema = z.object({
   inServiceDate: z.string().optional(),
   outOfServiceDate: z.string().optional(),
   customQrCode: z.string().optional(),
+  rfidTag: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 interface EquipmentFormDialogProps {
-  tileUuid: string;
+  /** Tile to link. Omit (or pass null) to create QR/RFID-only equipment. */
+  tileUuid?: string | null;
   existingEquipment?: Equipment | null;
   trigger?: React.ReactNode;
   open?: boolean;
@@ -66,6 +69,7 @@ export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger, open
       inServiceDate: toDateInputValue(existingEquipment?.inServiceDate),
       outOfServiceDate: toDateInputValue(existingEquipment?.outOfServiceDate),
       customQrCode: existingEquipment?.customQrCode || "",
+      rfidTag: existingEquipment?.rfidTag || "",
     },
   });
 
@@ -81,26 +85,41 @@ export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger, open
         ...values,
         inServiceDate: values.inServiceDate ? new Date(values.inServiceDate).toISOString() : undefined,
         outOfServiceDate: values.outOfServiceDate ? new Date(values.outOfServiceDate).toISOString() : undefined,
-        customQrCode: values.customQrCode || undefined,
+        // Send empty strings through; the server normalizes them to null,
+        // which is what allows clearing a tag on edit.
+        customQrCode: values.customQrCode ?? "",
+        rfidTag: values.rfidTag ?? "",
       };
 
       if (existingEquipment) {
         await updateMutation.mutateAsync({ id: existingEquipment.id, data: payload });
         toast({ title: "Equipment updated" });
       } else {
-        await createMutation.mutateAsync({ data: { tileUuid, ...payload } });
-        toast({ title: "Equipment created", description: "Record linked to Tile." });
+        await createMutation.mutateAsync({ data: { ...(tileUuid ? { tileUuid } : {}), ...payload } });
+        toast({
+          title: "Equipment created",
+          description: tileUuid ? "Record linked to Tile." : "Record created — attach tags any time.",
+        });
       }
       queryClient.invalidateQueries();
       setOpen(false);
-    } catch {
-      toast({ title: "Error", description: "Failed to save. Please try again.", variant: "destructive" });
+    } catch (err) {
+      const e = err as { status?: number; message?: string };
+      toast({
+        title: "Error",
+        description: e?.status === 409 && e.message
+          ? e.message.replace(/^HTTP \d+[^:]*:\s*/, "")
+          : "Failed to save. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleDelete = async () => {
     if (!existingEquipment) return;
-    if (confirm("Delete this equipment record? The Tile will remain but lose its metadata.")) {
+    if (confirm(existingEquipment.tileUuid
+      ? "Delete this equipment record? The Tile will remain but lose its metadata."
+      : "Delete this equipment record? Its QR/RFID tags will no longer resolve.")) {
       try {
         await deleteMutation.mutateAsync({ id: existingEquipment.id });
         toast({ title: "Equipment deleted" });
@@ -131,7 +150,7 @@ export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger, open
       <DialogContent className="sm:max-w-[520px] border-primary/20 rounded-none bg-card max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-mono text-primary uppercase tracking-wider">
-            {existingEquipment ? "Edit Equipment" : "Link Equipment"}
+            {existingEquipment ? "Edit Equipment" : tileUuid ? "Link Equipment" : "Add Equipment"}
           </DialogTitle>
         </DialogHeader>
 
@@ -141,7 +160,7 @@ export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger, open
               <TabsList className="w-full rounded-none bg-muted/50 mb-4 h-9">
                 <TabsTrigger value="details" className="flex-1 font-mono text-xs uppercase rounded-none">Details</TabsTrigger>
                 <TabsTrigger value="service" className="flex-1 font-mono text-xs uppercase rounded-none">Service</TabsTrigger>
-                <TabsTrigger value="qr" className="flex-1 font-mono text-xs uppercase rounded-none">QR / Tag</TabsTrigger>
+                <TabsTrigger value="qr" className="flex-1 font-mono text-xs uppercase rounded-none">Tags</TabsTrigger>
               </TabsList>
 
               {/* ── Details tab ── */}
@@ -271,10 +290,10 @@ export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger, open
                 />
               </TabsContent>
 
-              {/* ── QR / Tag tab ── */}
+              {/* ── Tags tab (QR / barcode / RFID) ── */}
               <TabsContent value="qr" className="space-y-4 mt-0">
                 <p className="font-mono text-xs text-muted-foreground border-l-2 border-primary/40 pl-3">
-                  Attach an existing asset tag or barcode to this equipment. Scan it with the camera or type the value manually. The FieldTrack QR code is always auto-generated separately.
+                  Attach any combination of tags to this equipment: a custom QR/barcode, an RFID/NFC tag, or both. The FieldTrack QR code is always auto-generated separately.
                 </p>
 
                 {showScanner ? (
@@ -334,6 +353,57 @@ export function EquipmentFormDialog({ tileUuid, existingEquipment, trigger, open
                         </p>
                       </div>
                     )}
+
+                    {/* ── RFID / NFC tag ── */}
+                    <div className="border-t border-border pt-4 space-y-3">
+                      <FormField
+                        control={form.control}
+                        name="rfidTag"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="font-mono text-xs uppercase">RFID / NFC Tag ID</FormLabel>
+                            <div className="flex gap-2">
+                              <FormControl>
+                                <Input
+                                  placeholder="Scan tag or type its ID (e.g. 04:A3:1F:2A:B9:5C:80)"
+                                  className="font-mono text-sm bg-background rounded-none border-border"
+                                  {...field}
+                                  value={field.value || ""}
+                                />
+                              </FormControl>
+                              {field.value && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="rounded-none flex-shrink-0"
+                                  onClick={() => form.setValue("rfidTag", "")}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <NfcScanButton
+                        onDetected={(tagId) => {
+                          form.setValue("rfidTag", tagId);
+                          toast({ title: "RFID/NFC tag detected", description: tagId });
+                        }}
+                      />
+
+                      {form.watch("rfidTag") && (
+                        <div className="flex items-start gap-2 p-3 border border-green-500/30 bg-green-500/5">
+                          <Nfc className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <p className="font-mono text-xs text-green-400 break-all">
+                            {form.watch("rfidTag")}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </TabsContent>

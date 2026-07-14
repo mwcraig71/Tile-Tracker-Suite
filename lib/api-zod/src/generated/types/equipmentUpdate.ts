@@ -7,7 +7,11 @@
  */
 
 export interface EquipmentUpdate {
+  /** @nullable */
+  tileUuid?: string | null;
   customQrCode?: string;
+  /** @nullable */
+  rfidTag?: string | null;
   label?: string;
   category?: string;
   description?: string;

@@ -8,10 +8,13 @@
 
 export interface Equipment {
   id: number;
-  tileUuid: string;
+  /** @nullable */
+  tileUuid?: string | null;
   qrToken: string;
   /** @nullable */
   customQrCode?: string | null;
+  /** @nullable */
+  rfidTag?: string | null;
   label: string;
   category: string;
   /** @nullable */
